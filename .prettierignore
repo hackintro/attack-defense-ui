@@ -1,0 +1,33 @@
+# Build output
+dist
+build
+
+# Dependencies
+node_modules
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.*
+
+# Cache directories
+.cache
+.next
+.nuxt
+.vuepress/dist
+
+# Coverage directory
+coverage
+
+# Mac files
+.DS_Store
+
+# Editor directories
+.idea
+.vscode
+*.swp
+*.swo
