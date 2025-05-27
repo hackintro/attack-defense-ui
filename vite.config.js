@@ -11,10 +11,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/status': {
-        target: 'http://localhost:8000',
+        target: 'https://ctf.hackintro25.di.uoa.gr',
         changeOrigin: true,
-        secure: false,
-        },
+      },
     }
   }
 })
