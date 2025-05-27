@@ -112,7 +112,12 @@ const Footer = ({ currentTheme }) => (
 const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }) => {
   return (
     <div className={`flex min-h-screen flex-col ${currentTheme.background}`}>
-      <Navbar theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} lastUpdateTime={lastUpdateTime} />
+      <Navbar
+        theme={theme}
+        toggleTheme={toggleTheme}
+        currentTheme={currentTheme}
+        lastUpdateTime={lastUpdateTime}
+      />
       <main className="flex-grow overflow-hidden">{children}</main>
       <Footer currentTheme={currentTheme} />
     </div>

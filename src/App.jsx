@@ -59,16 +59,34 @@ export default function App() {
         <Route
           path="/"
           element={
-            <Layout theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} lastUpdateTime={lastUpdateTime}>
-              <AttackDefenseCTFGraph theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
+            <Layout
+              theme={theme}
+              toggleTheme={toggleTheme}
+              currentTheme={currentTheme}
+              lastUpdateTime={lastUpdateTime}
+            >
+              <AttackDefenseCTFGraph
+                theme={theme}
+                currentTheme={currentTheme}
+                onDataUpdate={setLastUpdateTime}
+              />
             </Layout>
           }
         />
         <Route
           path="/leaderboard"
           element={
-            <Layout theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} lastUpdateTime={lastUpdateTime}>
-              <Leaderboard theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
+            <Layout
+              theme={theme}
+              toggleTheme={toggleTheme}
+              currentTheme={currentTheme}
+              lastUpdateTime={lastUpdateTime}
+            >
+              <Leaderboard
+                theme={theme}
+                currentTheme={currentTheme}
+                onDataUpdate={setLastUpdateTime}
+              />
             </Layout>
           }
         />

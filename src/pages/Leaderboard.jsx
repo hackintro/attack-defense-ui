@@ -17,13 +17,14 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   useEffect(() => {
     // TODO: Replace with actual API call
     fetch('/status')
-      .then(response => response.json())
-      .then(data => {
+      .then((response) => response.json())
+      .then((data) => {
         setTeams(data.teams);
         setStatus(data.status);
+        onDataUpdate(new Date());
       })
-      .catch(error => console.error('Error fetching status:', error));
-/*
+      .catch((error) => console.error('Error fetching status:', error));
+    /*
     // Mock data for testing (same as AttackDefenseCTFGraph)
     const mockData = {
       teams: {
@@ -78,8 +79,10 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
 
     setTeams(mockData.teams);
     setStatus(mockData.status);
+
 */
-  }, []);
+    onDataUpdate(new Date());
+  }, [onDataUpdate]);
 
   useEffect(() => {
     if (!teams || !status) return;
