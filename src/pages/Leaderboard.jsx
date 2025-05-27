@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table';
 import { useEffect, useState } from 'react';
 
-export default function Leaderboard({ theme, currentTheme }) {
+export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   const [teams, setTeams] = useState(null);
   const [status, setStatus] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -21,6 +21,7 @@ export default function Leaderboard({ theme, currentTheme }) {
     //   .then(data => {
     //     setTeams(data.teams);
     //     setStatus(data.status);
+    //     onDataUpdate(new Date()); // Update last update time
     //   })
     //   .catch(error => console.error('Error fetching status:', error));
 
@@ -78,7 +79,8 @@ export default function Leaderboard({ theme, currentTheme }) {
 
     setTeams(mockData.teams);
     setStatus(mockData.status);
-  }, []);
+    onDataUpdate(new Date()); // Simulate API response time
+  }, [onDataUpdate]);
 
   useEffect(() => {
     if (!teams || !status) return;

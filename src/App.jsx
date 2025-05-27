@@ -15,6 +15,9 @@ export default function App() {
     return 'dark';
   });
 
+  // Add state for last update time
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+
   // Save theme to cookie when it changes
   useEffect(() => {
     setCookie('attack-defense-theme', theme, 7);
@@ -56,16 +59,16 @@ export default function App() {
         <Route
           path="/"
           element={
-            <Layout theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme}>
-              <AttackDefenseCTFGraph theme={theme} currentTheme={currentTheme} />
+            <Layout theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} lastUpdateTime={lastUpdateTime}>
+              <AttackDefenseCTFGraph theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />
         <Route
           path="/leaderboard"
           element={
-            <Layout theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme}>
-              <Leaderboard theme={theme} currentTheme={currentTheme} />
+            <Layout theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} lastUpdateTime={lastUpdateTime}>
+              <Leaderboard theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />

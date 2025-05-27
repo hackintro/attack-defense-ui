@@ -1,9 +1,9 @@
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const Navbar = ({ theme, toggleTheme, currentTheme }) => {
+const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
@@ -49,7 +49,7 @@ const Navbar = ({ theme, toggleTheme, currentTheme }) => {
         <div className="hidden lg:flex lg:items-center lg:space-x-6">
           <NavLinks />
           <div className={`${currentTheme.textSecondary} hidden text-sm xl:block`}>
-            Last Update: {new Date().toLocaleTimeString()}
+            Last Update: {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Never'}
           </div>
           <button
             onClick={toggleTheme}
@@ -85,7 +85,7 @@ const Navbar = ({ theme, toggleTheme, currentTheme }) => {
                 <div
                   className={`mt-6 border-t pt-6 ${currentTheme.border} ${currentTheme.textSecondary} text-sm`}
                 >
-                  Last Update: {new Date().toLocaleTimeString()}
+                  Last Update: {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Never'}
                 </div>
               </div>
             </SheetContent>
@@ -109,10 +109,10 @@ const Footer = ({ currentTheme }) => (
   </footer>
 );
 
-const Layout = ({ children, theme, toggleTheme, currentTheme }) => {
+const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }) => {
   return (
     <div className={`flex min-h-screen flex-col ${currentTheme.background}`}>
-      <Navbar theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} />
+      <Navbar theme={theme} toggleTheme={toggleTheme} currentTheme={currentTheme} lastUpdateTime={lastUpdateTime} />
       <main className="flex-grow overflow-hidden">{children}</main>
       <Footer currentTheme={currentTheme} />
     </div>

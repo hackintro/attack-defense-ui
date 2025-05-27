@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
 
-export default function AttackDefenseCTFGraph({ theme, currentTheme }) {
+export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdate }) {
   const svgRef = useRef();
   // const [nodes, setNodes] = useState(null);
   const [teams, setTeams] = useState(null);
@@ -81,10 +81,13 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme }) {
       .then(data => {
         setTeams(data.teams);
         setStatus(data.status);
+        onDataUpdate(new Date());
       })
       .catch(err => console.error("Failed to fetch nodes:", err));
     */
-  }, []);
+
+      onDataUpdate(new Date()); // Update last updated time
+  }, [onDataUpdate]);
 
   useEffect(() => {
     if (!teams) return;
