@@ -78,8 +78,8 @@ export default function Leaderboard({ theme, currentTheme }) {
 
     setTeams(mockData.teams);
     setStatus(mockData.status);
-  }, []);
 */
+  }, []);
 
   useEffect(() => {
     if (!teams || !status) return;
