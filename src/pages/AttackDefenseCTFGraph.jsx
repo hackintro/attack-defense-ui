@@ -19,63 +19,62 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
 
   useEffect(() => {
     // Mock data for testing
-    // Comment out mock data when using real API
-    const mockData = {
-      teams: {
-        1: 'Team Alpha',
-        2: 'Team Beta',
-        3: 'Team Gamma',
-        4: 'Team Delta',
-      },
-      status: {
-        1: {
-          0: {
-            mapflix: { on: 1, teams_hit: [2, 3, 4] },
-            powerball: { on: 1, teams_hit: [2, 3, 4] },
-            bananananana: { on: 1, teams_hit: [2, 3, 4] },
-            auth: { on: 1, teams_hit: [2, 3, 4] },
-            muzac: { on: 1, teams_hit: [2, 3, 4] },
-            pwnazon: { on: 1, teams_hit: [2, 3, 4] },
-          },
-        },
-        2: {
-          0: {
-            mapflix: { on: 1, teams_hit: [1, 3, 4] },
-            powerball: { on: 1, teams_hit: [1, 3, 4] },
-            bananananana: { on: 1, teams_hit: [1, 3, 4] },
-            auth: { on: 1, teams_hit: [1, 3, 4] },
-            muzac: { on: 1, teams_hit: [1, 3, 4] },
-            pwnazon: { on: 1, teams_hit: [1, 3, 4] },
-          },
-        },
-        3: {
-          0: {
-            mapflix: { on: 1, teams_hit: [1, 2, 4] },
-            powerball: { on: 1, teams_hit: [1, 2, 4] },
-            bananananana: { on: 1, teams_hit: [1, 2, 4] },
-            auth: { on: 1, teams_hit: [1, 2, 4] },
-            muzac: { on: 1, teams_hit: [1, 2, 4] },
-            pwnazon: { on: 1, teams_hit: [1, 2, 4] },
-          },
-        },
-        4: {
-          0: {
-            mapflix: { on: 1, teams_hit: [1, 2, 3] },
-            powerball: { on: 1, teams_hit: [1, 2, 3] },
-            bananananana: { on: 1, teams_hit: [1, 2, 3] },
-            auth: { on: 1, teams_hit: [1, 2, 3] },
-            muzac: { on: 1, teams_hit: [1, 2, 3] },
-            pwnazon: { on: 1, teams_hit: [1, 2, 3] },
-          },
-        },
-      },
-    };
-    // Set mock data to state
-    setTeams(mockData.teams);
-    setStatus(mockData.status);
+//    // Comment out mock data when using real API
+//    const mockData = {
+//      teams: {
+//        1: 'Team Alpha',
+//        2: 'Team Beta',
+//        3: 'Team Gamma',
+//        4: 'Team Delta',
+//      },
+//      status: {
+//        1: {
+//          0: {
+//            mapflix: { on: 1, teams_hit: [2, 3, 4] },
+//            powerball: { on: 1, teams_hit: [2, 3, 4] },
+//            bananananana: { on: 1, teams_hit: [2, 3, 4] },
+//            auth: { on: 1, teams_hit: [2, 3, 4] },
+//            muzac: { on: 1, teams_hit: [2, 3, 4] },
+//            pwnazon: { on: 1, teams_hit: [2, 3, 4] },
+//          },
+//        },
+//        2: {
+//          0: {
+//            mapflix: { on: 1, teams_hit: [1, 3, 4] },
+//            powerball: { on: 1, teams_hit: [1, 3, 4] },
+//            bananananana: { on: 1, teams_hit: [1, 3, 4] },
+//            auth: { on: 1, teams_hit: [1, 3, 4] },
+//            muzac: { on: 1, teams_hit: [1, 3, 4] },
+//            pwnazon: { on: 1, teams_hit: [1, 3, 4] },
+//          },
+//        },
+//        3: {
+//          0: {
+//            mapflix: { on: 1, teams_hit: [1, 2, 4] },
+//            powerball: { on: 1, teams_hit: [1, 2, 4] },
+//            bananananana: { on: 1, teams_hit: [1, 2, 4] },
+//            auth: { on: 1, teams_hit: [1, 2, 4] },
+//            muzac: { on: 1, teams_hit: [1, 2, 4] },
+//            pwnazon: { on: 1, teams_hit: [1, 2, 4] },
+//          },
+//        },
+//        4: {
+//          0: {
+//            mapflix: { on: 1, teams_hit: [1, 2, 3] },
+//            powerball: { on: 1, teams_hit: [1, 2, 3] },
+//            bananananana: { on: 1, teams_hit: [1, 2, 3] },
+//            auth: { on: 1, teams_hit: [1, 2, 3] },
+//            muzac: { on: 1, teams_hit: [1, 2, 3] },
+//            pwnazon: { on: 1, teams_hit: [1, 2, 3] },
+//          },
+//        },
+//      },
+//    };
+//    // Set mock data to state
+//    setTeams(mockData.teams);
+//    setStatus(mockData.status);
 
     //  Uncomment below to fetch real data from API
-    /*
     fetch("/status")
       .then(res => res.json())
       .then(data => {
@@ -84,10 +83,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         onDataUpdate(new Date());
       })
       .catch(err => console.error("Failed to fetch nodes:", err));
-    */
-
-      onDataUpdate(new Date()); // Update last updated time
-  }, [onDataUpdate]);
+  }, []);
 
   useEffect(() => {
     if (!teams) return;
