@@ -20,7 +20,7 @@ export default function Truth({ theme, currentTheme, onDataUpdate }) {
     <main className="container mx-auto flex-1 px-4 py-6">
       <h1 className="mb-8 text-center text-2xl font-bold italic text-red-500">Is any of it real?</h1>
 
-      <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+      <div className="relative aspect-video md:aspect-video aspect-auto h-screen md:h-auto w-full overflow-hidden rounded-lg">
         {!isLoaded && (
           <div
             className={`absolute inset-0 flex items-center justify-center ${currentTheme.svgBackground}`}
