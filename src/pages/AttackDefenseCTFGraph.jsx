@@ -83,6 +83,8 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         onDataUpdate(new Date());
       })
       .catch((err) => console.error('Failed to fetch nodes:', err));
+
+    onDataUpdate(new Date());
   }, [onDataUpdate]);
 
   useEffect(() => {
