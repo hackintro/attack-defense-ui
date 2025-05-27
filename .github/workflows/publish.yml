@@ -1,0 +1,35 @@
+# Github action to run npm install + npm run build and then push the dist.tar.gz as an artifact
+
+name: Publish
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Create dist.tar.gz
+        run: tar -czf dist.tar.gz dist
+
+      - name: Upload dist.tar.gz as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist.tar.gz
+          path: dist.tar.gz
