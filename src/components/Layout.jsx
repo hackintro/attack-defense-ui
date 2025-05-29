@@ -70,7 +70,7 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <button
-                className={`rounded-lg p-2 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} transition-opacity hover:opacity-80`}
+                className={`rounded-lg p-2 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
                 aria-label="Open navigation menu"
               >
                 <Menu size={18} />
@@ -118,6 +118,19 @@ const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }) 
         currentTheme={currentTheme}
         lastUpdateTime={lastUpdateTime}
       />
+      <div
+        className={`top-16 z-50 mx-auto w-full px-4 py-2 text-right text-sm ${currentTheme.textPrimary} transition-all duration-300`}
+      >
+        Stuck?{' '}
+        <a
+          href="https://discord.gg/C9NpWw4wqE "
+          className="underline transition-opacity hover:opacity-80"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Join our Discord
+        </a>
+      </div>
       <main className="flex-grow overflow-hidden">{children}</main>
       <Footer currentTheme={currentTheme} />
     </div>
