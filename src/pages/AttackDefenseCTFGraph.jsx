@@ -226,7 +226,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         .attr('font-size', '14px')
         .attr('font-weight', '600')
         .attr('font-family', 'system-ui, -apple-system, sans-serif')
-        .text(teams[id] + ' (' + score + ')');
+        .text(teams[id] + ' (' + score ?? 0 + ')');
     });
 
     const sendMessage = (src, dst, color) => {
