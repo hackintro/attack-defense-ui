@@ -88,7 +88,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   }, [onDataUpdate]);
 
   useEffect(() => {
-    if (!teams) return;
+    if (!teams || !status) return;
 
     // Compute score per team
     const scores = {};
