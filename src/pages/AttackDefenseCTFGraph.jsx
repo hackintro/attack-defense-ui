@@ -177,9 +177,11 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     // for each team, we show the status for every time window for each service.
     // When plotting we just need to plot the status at the last time window.
 
-    const timeWindows = Object.keys(status[1]).map((x) => parseInt(x));
+    const sampleTeamId = Object.keys(status)[0];
+    const timeWindows = sampleTeamId && status[sampleTeamId] ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x)) : [];
+
     console.log(timeWindows);
-    const maxTimeWindow = Math.max(...timeWindows);
+    const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
     console.log(maxTimeWindow);
 
     const services = Object.keys(status[1][maxTimeWindow]);
@@ -189,17 +191,19 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
 
     const messages = [];
 
-    for (const teamId in status) {
-      const teamStatus = status[teamId];
-      const lastStatus = teamStatus[maxTimeWindow];
-      for (const service in lastStatus) {
-        const serviceStatus = lastStatus[service];
-        //if (serviceStatus.on) {
-        // For each service that is on, we create a message
-        for (const team of serviceStatus.teams_hit) {
-          const team_hit_id = team.toString();
-          const color = d3.color(serviceColors(service)).formatHex();
-          messages.push([teamId, team_hit_id, color]);
+    if (maxTimeWindow !== null) {
+      for (const teamId in status) {
+        const teamStatus = status[teamId];
+        const lastStatus = teamStatus[maxTimeWindow];
+        for (const service in lastStatus) {
+          const serviceStatus = lastStatus[service];
+          //if (serviceStatus.on) {
+          // For each service that is on, we create a message
+          for (const team of serviceStatus.teams_hit) {
+            const team_hit_id = team.toString();
+            const color = d3.color(serviceColors(service)).formatHex();
+            messages.push([teamId, team_hit_id, color]);
+          }
         }
       }
     }
