@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  release-frontend:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Fetch tags
+      run: git fetch --tags
+
+    - name: Get latest tag
+      id: get_tag
+      run: |
+        latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` || true)
+        echo "Latest tag: $latest_tag"
+        echo "::set-output name=tag::$latest_tag"
+
+    - name: Calculate new version
+      id: new_version
+      run: |
+        if [ -z "${{ steps.get_tag.outputs.tag }}" ]; then
+          # No tags found, set initial version
+          new_version="0.1.0"
+        else
+          # Parse the latest version
+          latest_version=${{ steps.get_tag.outputs.tag }}
+          IFS='.' read -r -a version_parts <<< "$latest_version"
+          major=${version_parts[0]}
+          minor=${version_parts[1]}
+          patch=${version_parts[2]}
+          # Increment the patch version
+          patch=$((patch+1))
+          new_version="$major.$minor.$patch"
+        fi
+        echo "New version: $new_version"
+        echo "::set-output name=version::$new_version"
+
+    - name: Create new tag
+      run: |
+        git tag ${{ steps.new_version.outputs.version }}
+        git push origin ${{ steps.new_version.outputs.version }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build project
+      run: npm run build
+
+    - name: Create dist.tar.gz
+      run: tar -czf dist.tar.gz dist
+
+    - name: Install Hub CLI
+      run: sudo apt-get update --fix-missing && sudo apt-get install -y hub
+
+    - name: Upload dist.tar.gz to GitHub Releases
+      run: |
+        set -x
+        tag_name="${{ steps.new_version.outputs.version }}"
+        hub release create "dist.tar.gz" -m "$tag_name" "$tag_name"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
