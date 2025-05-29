@@ -184,7 +184,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
     console.log(maxTimeWindow);
 
-    const services = Object.keys(status[1][maxTimeWindow]);
+    const services = maxTimeWindow !== null ? Object.keys(status[1][maxTimeWindow]) : [];
     console.log('Services:', services);
     // create a map from every service to a color
     const serviceColors = d3.scaleOrdinal().domain(services).range(d3.schemeCategory10);
