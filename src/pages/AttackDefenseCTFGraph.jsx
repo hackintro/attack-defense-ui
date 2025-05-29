@@ -212,9 +212,11 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     Object.entries(nodes).forEach(([id, { x, y, color, score }]) => {
       g.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
 
+      const labelOffset = 35; // Distance from node
+      const labelY = y < cy ? y - labelOffset : y + labelOffset;
       g.append('text')
         .attr('x', x)
-        .attr('y', y - 30)
+        .attr('y', labelY)
         .attr('text-anchor', 'middle')
         .attr('fill', currentTheme.teamNameColor) // Use theme-based color
         .attr('font-size', '14px')
@@ -305,68 +307,72 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   }, [teams, status, theme, isMobile]);
 
   return (
-    <main className="container mx-auto flex-1 px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>
-            Real-time Attack Visualization
-          </h2>
-          <p className={currentTheme.textSecondary}>
-            Monitor live attacks and defenses between competing teams
-          </p>
+    <>
+      <main className="container mx-auto flex-1 px-4 py-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>
+              Real-time Attack Visualization
+            </h2>
+            <p className={currentTheme.textSecondary}>
+              Monitor live attacks and defenses between competing teams
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Full screen graph container with overlay scoring system */}
-      <div className="relative h-[calc(100vh-200px)] w-full">
-        {/* Scoring System - Responsive positioning */}
-        <div
-          className={`absolute ${isMobile ? 'left-2 top-2' : 'right-4 top-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
-        >
+        {/* Full screen graph container with overlay scoring system */}
+        <div className="relative h-[calc(100vh-200px)] w-full">
+          {/* Scoring System - Responsive positioning */}
           <div
-            className={`${currentTheme.cardBackground} rounded-lg border p-3 shadow-lg ${currentTheme.border} ${isMobile ? 'text-xs' : ''}`}
+            className={`absolute ${isMobile ? 'left-2 top-2' : 'right-4 top-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
           >
-            <h3
-              className={`${currentTheme.textPrimary} mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}
-            >
-              Scoring System
-            </h3>
-            <div className={`space-y-1 text-xs ${currentTheme.textTertiary}`}>
-              <div className="flex justify-between">
-                <span>Operational Service:</span>
-                <span className="text-green-400">+42 pts</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Successful Attack:</span>
-                <span className="text-blue-400">+2 pts</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Compromised Service:</span>
-                <span className="text-red-400">-2 pts</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile instructions */}
-        {isMobile && (
-          <div className="absolute bottom-4 left-4 z-10">
             <div
-              className={`${currentTheme.cardBackground} rounded-lg border p-2 shadow-lg ${currentTheme.border}`}
+              className={`${currentTheme.cardBackground} rounded-lg border p-3 shadow-lg ${currentTheme.border} ${isMobile ? 'text-xs' : ''}`}
             >
-              <p className={`text-xs ${currentTheme.textSecondary}`}>Pinch to zoom • Drag to pan</p>
+              <h3
+                className={`${currentTheme.textPrimary} mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}
+              >
+                Scoring System
+              </h3>
+              <div className={`space-y-1 text-xs ${currentTheme.textTertiary}`}>
+                <div className="flex justify-between">
+                  <span>Operational Service:</span>
+                  <span className="text-green-400">+42 pts</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Successful Attack:</span>
+                  <span className="text-blue-400">+2 pts</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Compromised Service:</span>
+                  <span className="text-red-400">-2 pts</span>
+                </div>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Full screen SVG graph */}
-        <div className={`h-full w-full ${currentTheme.cardBackground} rounded-lg`}>
-          <svg
-            ref={svgRef}
-            className={`h-full w-full border ${currentTheme.border} rounded ${currentTheme.svgBackground} ${isMobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
-          ></svg>
+          {/* Mobile instructions */}
+          {isMobile && (
+            <div className="absolute bottom-4 left-4 z-10">
+              <div
+                className={`${currentTheme.cardBackground} rounded-lg border p-2 shadow-lg ${currentTheme.border}`}
+              >
+                <p className={`text-xs ${currentTheme.textSecondary}`}>
+                  Pinch to zoom • Drag to pan
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Full screen SVG graph */}
+          <div className={`h-full w-full ${currentTheme.cardBackground} rounded-lg`}>
+            <svg
+              ref={svgRef}
+              className={`h-full w-full border ${currentTheme.border} rounded ${currentTheme.svgBackground} ${isMobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            ></svg>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
