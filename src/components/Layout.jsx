@@ -35,6 +35,20 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
       >
         Leaderboard
       </Link>
+      <Link
+        to="/rules"
+        onClick={() => {
+          onLinkClick();
+          if (mobile) setSheetOpen(false);
+        }}
+        className={`text-sm font-medium transition-colors hover:opacity-80 ${
+          location.pathname === '/rules'
+            ? currentTheme.textPrimary
+            : currentTheme.textSecondary
+        }`}
+      >
+        Rules
+      </Link>
     </div>
   );
 

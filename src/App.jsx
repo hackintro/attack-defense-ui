@@ -2,6 +2,7 @@ import Layout from './components/Layout';
 import AttackDefenseCTFGraph from './pages/AttackDefenseCTFGraph';
 import Leaderboard from './pages/Leaderboard';
 import Truth from './pages/Truth';
+import Rules from './pages/Rules';
 import { getCookie, setCookie } from './utils/cookies';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
@@ -101,6 +102,19 @@ export default function App() {
               lastUpdateTime={lastUpdateTime}
             >
               <Truth theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
+            </Layout>
+          }
+        />
+        <Route
+          path="rules"
+          element={
+            <Layout
+              theme={theme}
+              toggleTheme={toggleTheme}
+              currentTheme={currentTheme}
+              lastUpdateTime={lastUpdateTime}
+            >
+              <Rules theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />
