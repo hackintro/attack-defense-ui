@@ -73,6 +73,6 @@ jobs:
       run: |
         set -x
         tag_name="${{ steps.new_version.outputs.version }}"
-        hub release create "dist.tar.gz" -m "$tag_name" "$tag_name"
+        hub release create -a "dist.tar.gz" -m "$tag_name" "$tag_name"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
