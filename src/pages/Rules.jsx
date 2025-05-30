@@ -11,7 +11,7 @@ export default function rules({ theme, currentTheme }) {
       <div className={`${currentTheme.textSecondary}`}>
         Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the rules to ensure a fair and fun experience for everyone:
         <h2 className="text-xl" id="rules"><a href="#rules">Rules</a></h2>
-        <ul className="">
+        <ul>
           <li>Rule #1: We play fair. No attempts to gain root access, no DOS, no attacks on the infrastructure or our fellow students and instructors. We extract flags and submit them - we do *NOT* rm -rf / and so on. Failure to do so will result in a grade of zero, but even worse, it'll ruin the experience for everyone.</li>
           <li>Rule #2: Make sure you follow rule #1.</li>
         </ul>
@@ -33,7 +33,7 @@ export default function rules({ theme, currentTheme }) {
 
         <h2 className="text-xl" id="flag-submission"><a href="#flag-submission">Flag Submission</a></h2>
         Your repo will contain an api_key that you can use to submit flags. To submit a flag, run the following:
-        <pre className="bg-gray-100 p-4 rounded-md">
+        <pre>
           <code className="text-sm">
             curl https://ctf.hackintro25.di.uoa.gr/submit -H "Content-Type: application/json" -H "Authorization: Bearer your_api_key" -d '{'{"flag": "flag_contents_go_here"}'}'
           </code>
@@ -48,9 +48,17 @@ export default function rules({ theme, currentTheme }) {
         </ul>
         The leaderboard will reflect these metrics as the game progresses. Consider the various tradeoffs and choose wisely on what strategy you want to follow. The game is designed to be educational, so try different approaches and learn from them.
 
-        <h2 className="text-xl" id="help"><a href="#help">Help</a></h2>
+        <h2 className="text-xl" id="help"><a href="#help">Help and Tips</a></h2>
         <ul className="">
             <li>Are you getting exploited and want to see how? You may be able to figure it out through the pcaps that are being captured under /pcaps in your box.</li>
+            <li>Wanna sudo to a service user? Simply run:
+            <pre>
+              <code className="text-sm">
+                sudo -u service_user_name bash
+              </code>
+            </pre>
+            </li>
+            <li>Can't find an exploit? Move to another service, maybe this one isn't exploitable. The opposing team fixed their bug and you can no longer exploit them? Look deeper into the code, maybe more than one bugs are present.</li>
             <li>Did you get compromised or accidentally lost all your service files? You can find a copy of them under /home/ctf/backup and hopefully you can still restore service.</li>
             <li>Need help / have a question / wanna share ideas or provide commentary? You can follow the traditional route for such events, aka reach out to the #attack-defense channel on Discord. Mods should be responsive during "normal hours".</li>
         </ul>
