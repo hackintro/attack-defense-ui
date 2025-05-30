@@ -10,7 +10,7 @@ export default function Rules({ theme, currentTheme }) {
           rehypePlugins={[rehypeRaw]}
           components={{
             h1: ({node, ...props}) => <h1 className="mb-8 text-center text-2xl font-bold" {...props} />,
-            h2: ({node, ...props}) => <h2 className="text-xl mt-6 mb-4" {...props} />,
+            h2: ({node, ...props}) => <h2 className="text-xl mt-6 mb-4 font-bold" {...props} />,
             ul: ({node, ...props}) => <ul className="list-disc pl-6 space-y-2 text-justify" {...props} />,
             code: ({node, ...props}) => 
 
