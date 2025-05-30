@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { act, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom'; // Make sure you use react-router
+import { useSearchParams } from 'react-router-dom';
 
 export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdate }) {
   const svgRef = useRef();
@@ -12,15 +13,46 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   const [selectedTimeWindow, setSelectedTimeWindow] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const sampleTeamId = status !== null ? Object.keys(status)[0] : null;
+  const windowsPerPage = 10;
+  const [windowPage, setWindowPage] = useState(0);
 
-  const timeWindows = sampleTeamId && status[sampleTeamId] ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x)) : [];
+  // Compute time windows and max window
+  const sampleTeamId = status !== null ? Object.keys(status)[0] : null;
+  const timeWindows =
+    sampleTeamId && status[sampleTeamId]
+      ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x))
+      : [];
+  const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
+
+  // Set default selected window to latest
+  useEffect(() => {
+    if (maxTimeWindow !== null && selectedTimeWindow === null) {
+      setSelectedTimeWindow(maxTimeWindow);
+      setSearchParams({ window: maxTimeWindow });
+      setWindowPage(Math.floor(maxTimeWindow / windowsPerPage));
+    }
+  }, [maxTimeWindow, selectedTimeWindow, setSearchParams]);
+
+  // Update windowPage if selectedTimeWindow changes (e.g., via URL)
+  useEffect(() => {
+    if (selectedTimeWindow !== null) {
+      setWindowPage(Math.floor(selectedTimeWindow / windowsPerPage));
+    }
+  }, [selectedTimeWindow]);
+
+  const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
+
+  // Calculate paginated windows
+  const totalPages = Math.ceil(timeWindows.length / windowsPerPage);
+  const pageStart = windowPage * windowsPerPage;
+  const pageEnd = pageStart + windowsPerPage;
+  const paginatedWindows = timeWindows.slice(pageStart, pageEnd);
 
   console.log('Time Windows:', timeWindows);
 
   console.log(timeWindows);
-  const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
-  const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
+  // const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
+  // const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
 
   console.log(activeTimeWindow);
 
@@ -77,7 +109,10 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
           }
           scores[teamId] += serviceStatus.teams_hit.length * 2; // Each team hit gives 2 points
           for (const otherTeamId in status) {
-            if (otherTeamId !== teamId && status[otherTeamId][timeWindow][service].teams_hit.includes(parseInt(teamId))) {
+            if (
+              otherTeamId !== teamId &&
+              status[otherTeamId][timeWindow][service].teams_hit.includes(parseInt(teamId))
+            ) {
               // If another team hit this team, they lose 2 points
               scores[teamId] -= 2;
             }
@@ -293,23 +328,41 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
           {/* Time Window Selector */}
           {timeWindows.length > 0 && (
             <div className="flex flex-col items-center gap-2">
-              <span className={`text-sm font-medium ${currentTheme.textSecondary}`}>
-                Window
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {timeWindows.map((tw) => (
+              <span className={`text-sm font-medium ${currentTheme.textSecondary}`}>Window</span>
+              <div className="flex flex-wrap items-center gap-1">
+                {/* Left button */}
+                <button
+                  onClick={() => setWindowPage((p) => Math.max(0, p - 1))}
+                  disabled={windowPage === 0}
+                  className={`h-6 w-6 rounded border border-gray-700 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-blue-400 disabled:opacity-50`}
+                  title="Previous windows"
+                  style={{ minWidth: '1.5rem' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {/* Window buttons */}
+                {paginatedWindows.map((tw) => (
                   <button
                     key={tw}
                     onClick={() => {
                       setSelectedTimeWindow(tw);
                       setSearchParams({ window: tw });
                     }}
-                    className={`w-6 h-6 text-xs rounded ${tw === activeTimeWindow ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'} hover:bg-blue-400`}
+                    className={`h-6 w-6 rounded border border-gray-700 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} ${tw === activeTimeWindow ? 'ring-2 ring-blue-400' : ''} hover:bg-blue-400`}
                     title={`Time Window ${tw}`}
                   >
                     {tw}
                   </button>
                 ))}
+                <button
+                  onClick={() => setWindowPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={windowPage >= totalPages - 1}
+                  className={`h-6 w-6 rounded border border-gray-700 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-blue-400 disabled:opacity-50`}
+                  title="Next windows"
+                  style={{ minWidth: '1.5rem' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
               </div>
             </div>
           )}
