@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
-import { useEffect, useRef, useState } from 'react';
+import { act, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom'; // Make sure you use react-router
 
 export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdate }) {
   const svgRef = useRef();
@@ -7,6 +8,28 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   const [teams, setTeams] = useState(null);
   const [status, setStatus] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const sampleTeamId = status !== null ? Object.keys(status)[0] : null;
+
+  const timeWindows = sampleTeamId && status[sampleTeamId] ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x)) : [];
+
+  console.log('Time Windows:', timeWindows);
+
+  console.log(timeWindows);
+  const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
+  const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
+
+  console.log(activeTimeWindow);
+
+  useEffect(() => {
+    const windowFromURL = parseInt(searchParams.get('window'));
+    if (!isNaN(windowFromURL)) {
+      setSelectedTimeWindow(windowFromURL);
+    }
+  }, [searchParams]);
 
   // Handle window resize
   useEffect(() => {
@@ -18,62 +41,6 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   }, []);
 
   useEffect(() => {
-    // Mock data for testing
-    //    // Comment out mock data when using real API
-    //    const mockData = {
-    //      teams: {
-    //        1: 'Team Alpha',
-    //        2: 'Team Beta',
-    //        3: 'Team Gamma',
-    //        4: 'Team Delta',
-    //      },
-    //      status: {
-    //        1: {
-    //          0: {
-    //            mapflix: { on: 1, teams_hit: [2, 3, 4] },
-    //            powerball: { on: 1, teams_hit: [2, 3, 4] },
-    //            bananananana: { on: 1, teams_hit: [2, 3, 4] },
-    //            auth: { on: 1, teams_hit: [2, 3, 4] },
-    //            muzac: { on: 1, teams_hit: [2, 3, 4] },
-    //            pwnazon: { on: 1, teams_hit: [2, 3, 4] },
-    //          },
-    //        },
-    //        2: {
-    //          0: {
-    //            mapflix: { on: 1, teams_hit: [1, 3, 4] },
-    //            powerball: { on: 1, teams_hit: [1, 3, 4] },
-    //            bananananana: { on: 1, teams_hit: [1, 3, 4] },
-    //            auth: { on: 1, teams_hit: [1, 3, 4] },
-    //            muzac: { on: 1, teams_hit: [1, 3, 4] },
-    //            pwnazon: { on: 1, teams_hit: [1, 3, 4] },
-    //          },
-    //        },
-    //        3: {
-    //          0: {
-    //            mapflix: { on: 1, teams_hit: [1, 2, 4] },
-    //            powerball: { on: 1, teams_hit: [1, 2, 4] },
-    //            bananananana: { on: 1, teams_hit: [1, 2, 4] },
-    //            auth: { on: 1, teams_hit: [1, 2, 4] },
-    //            muzac: { on: 1, teams_hit: [1, 2, 4] },
-    //            pwnazon: { on: 1, teams_hit: [1, 2, 4] },
-    //          },
-    //        },
-    //        4: {
-    //          0: {
-    //            mapflix: { on: 1, teams_hit: [1, 2, 3] },
-    //            powerball: { on: 1, teams_hit: [1, 2, 3] },
-    //            bananananana: { on: 1, teams_hit: [1, 2, 3] },
-    //            auth: { on: 1, teams_hit: [1, 2, 3] },
-    //            muzac: { on: 1, teams_hit: [1, 2, 3] },
-    //            pwnazon: { on: 1, teams_hit: [1, 2, 3] },
-    //          },
-    //        },
-    //      },
-    //    };
-    //    // Set mock data to state
-    //    setTeams(mockData.teams);
-    //    setStatus(mockData.status);
-
     //  Uncomment below to fetch real data from API
     fetch('/status')
       .then((res) => res.json())
@@ -98,6 +65,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     for (const teamId in status) {
       const teamStatus = status[teamId];
       for (const timeWindow in teamStatus) {
+        if (!(activeTimeWindow !== null && parseInt(timeWindow) <= activeTimeWindow)) continue; // Skip past time windows if activeTimeWindow is set
         const lastStatus = teamStatus[timeWindow];
         if (!scores[teamId]) {
           scores[teamId] = 0;
@@ -106,9 +74,13 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
           const serviceStatus = lastStatus[service];
           if (serviceStatus.on) {
             scores[teamId] += 42; // Each operational service gives 42 points
-            scores[teamId] += serviceStatus.teams_hit.length * 2; // Each team hit gives 2 points
-          } else {
-            scores[teamId] -= serviceStatus.teams_hit.length * 2; // Each team hitting them costs 2 points
+          }
+          scores[teamId] += serviceStatus.teams_hit.length * 2; // Each team hit gives 2 points
+          for (const otherTeamId in status) {
+            if (otherTeamId !== teamId && status[otherTeamId][timeWindow][service].teams_hit.includes(parseInt(teamId))) {
+              // If another team hit this team, they lose 2 points
+              scores[teamId] -= 2;
+            }
           }
         }
       }
@@ -177,24 +149,17 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     // for each team, we show the status for every time window for each service.
     // When plotting we just need to plot the status at the last time window.
 
-    const sampleTeamId = Object.keys(status)[0];
-    const timeWindows = sampleTeamId && status[sampleTeamId] ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x)) : [];
-
-    console.log(timeWindows);
-    const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
-    console.log(maxTimeWindow);
-
-    const services = maxTimeWindow !== null ? Object.keys(status[1][maxTimeWindow]) : [];
+    const services = activeTimeWindow !== null ? Object.keys(status[1][activeTimeWindow]) : [];
     console.log('Services:', services);
     // create a map from every service to a color
     const serviceColors = d3.scaleOrdinal().domain(services).range(d3.schemeCategory10);
 
     const messages = [];
 
-    if (maxTimeWindow !== null) {
+    if (activeTimeWindow !== null) {
       for (const teamId in status) {
         const teamStatus = status[teamId];
-        const lastStatus = teamStatus[maxTimeWindow];
+        const lastStatus = teamStatus[activeTimeWindow];
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
           //if (serviceStatus.on) {
@@ -308,7 +273,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     });
 
     return () => clearInterval(interval);
-  }, [teams, status, theme, isMobile]);
+  }, [teams, status, theme, isMobile, selectedTimeWindow]);
 
   return (
     <>
@@ -322,6 +287,27 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
               Monitor live attacks and defenses between competing teams
             </p>
           </div>
+        </div>
+
+        <div className="mb-4 flex items-center space-x-4">
+          {/* Time Window Selector */}
+            {timeWindows.length > 0 && (
+              <div className="top-4 left-4 z-10 flex flex-wrap gap-1">
+                {timeWindows.map((tw) => (
+                  <button
+                    key={tw}
+                    onClick={() => {
+                      setSelectedTimeWindow(tw);
+                      setSearchParams({ window: tw });
+                    }}
+                    className={`w-6 h-6 text-xs rounded ${tw === activeTimeWindow ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'} hover:bg-blue-400`}
+                    title={`Time Window ${tw}`}
+                  >
+                    {tw}
+                  </button>
+                ))}
+              </div>
+            )}
         </div>
 
         {/* Full screen graph container with overlay scoring system */}
