@@ -1,8 +1,8 @@
 import Layout from './components/Layout';
 import AttackDefenseCTFGraph from './pages/AttackDefenseCTFGraph';
 import Leaderboard from './pages/Leaderboard';
-import Truth from './pages/Truth';
 import Rules from './pages/Rules';
+import Truth from './pages/Truth';
 import { getCookie, setCookie } from './utils/cookies';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';

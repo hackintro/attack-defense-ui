@@ -1,6 +1,6 @@
+import rulesContent from '../content/rules.md?raw';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import rulesContent from '../content/rules.md?raw';
 
 export default function Rules({ theme, currentTheme }) {
   return (
@@ -9,13 +9,22 @@ export default function Rules({ theme, currentTheme }) {
         <ReactMarkdown
           rehypePlugins={[rehypeRaw]}
           components={{
-            h1: ({node, ...props}) => <h1 className="mb-8 text-center text-2xl font-bold" {...props} />,
-            h2: ({node, ...props}) => <h2 className="text-xl mt-6 mb-4 font-bold" {...props} />,
-            ul: ({node, ...props}) => <ul className="list-disc pl-6 space-y-2 text-justify" {...props} />,
-            code: ({node, ...props}) => 
-
-                <code className="bg-gray-600 text-white px-1 py-0.5 rounded text-sm" {...props} /> ,
-            pre: ({node, ...props}) => <pre className={`${currentTheme.cardBackground} ${currentTheme.textPrimary} p-4 rounded overflow-x-auto border ${currentTheme.border}`} {...props} />
+            h1: ({ node, ...props }) => (
+              <h1 className="mb-8 text-center text-2xl font-bold" {...props} />
+            ),
+            h2: ({ node, ...props }) => <h2 className="mb-4 mt-6 text-xl font-bold" {...props} />,
+            ul: ({ node, ...props }) => (
+              <ul className="list-disc space-y-2 pl-6 text-justify" {...props} />
+            ),
+            code: ({ node, ...props }) => (
+              <code className="rounded bg-gray-600 px-1 py-0.5 text-sm text-white" {...props} />
+            ),
+            pre: ({ node, ...props }) => (
+              <pre
+                className={`${currentTheme.cardBackground} ${currentTheme.textPrimary} overflow-x-auto rounded border p-4 ${currentTheme.border}`}
+                {...props}
+              />
+            ),
           }}
         >
           {rulesContent}
