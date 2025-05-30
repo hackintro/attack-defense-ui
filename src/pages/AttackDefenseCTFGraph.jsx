@@ -289,10 +289,14 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
           </div>
         </div>
 
-        <div className="mb-4 flex items-center space-x-4">
+        <div className="mb-4 flex items-center justify-center">
           {/* Time Window Selector */}
-            {timeWindows.length > 0 && (
-              <div className="top-4 left-4 z-10 flex flex-wrap gap-1">
+          {timeWindows.length > 0 && (
+            <div className="flex flex-col items-center gap-2">
+              <span className={`text-sm font-medium ${currentTheme.textSecondary}`}>
+                Window
+              </span>
+              <div className="flex flex-wrap gap-1">
                 {timeWindows.map((tw) => (
                   <button
                     key={tw}
@@ -307,7 +311,8 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
                   </button>
                 ))}
               </div>
-            )}
+            </div>
+          )}
         </div>
 
         {/* Full screen graph container with overlay scoring system */}
