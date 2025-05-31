@@ -16,6 +16,14 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   const windowsPerPage = 10;
   const [windowPage, setWindowPage] = useState(0);
 
+  // Track page visibility
+  const [isVisible, setIsVisible] = useState(!document.hidden);
+  useEffect(() => {
+    const onVisibility = () => setIsVisible(!document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
   // Compute time windows and max window
   const sampleTeamId = status !== null ? Object.keys(status)[0] : null;
   const timeWindows =
@@ -138,7 +146,8 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
       .attr('height', height)
       .attr('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
 
-    svg.selectAll('*').remove();
+    // Remove all previous SVG content
+    d3.select(svgRef.current).selectAll('*').remove();
 
     // Create zoom behavior
     const zoom = d3
@@ -291,24 +300,40 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
       svg.call(zoom.transform, initialTransform);
     }
 
-    // Send messages on interval
-    const interval = setInterval(() => {
+    // Store references to all timeouts for cleanup
+    const timeouts = [];
+    let stopped = false;
+
+    // Helper to send all messages (returns array of timeout IDs)
+    function animateMessages() {
+      if (stopped) return;
       messages.forEach(([srcId, dstId, color]) => {
         const src = nodes[srcId];
         const dst = nodes[dstId];
         sendMessage(src, dst, color);
       });
-    }, 3000);
+    }
 
-    // Trigger first send immediately
-    messages.forEach(([srcId, dstId, color]) => {
-      const src = nodes[srcId];
-      const dst = nodes[dstId];
-      sendMessage(src, dst, color);
-    });
+    // Animation loop using setTimeout for better control
+    function loop() {
+      if (stopped) return;
+      animateMessages();
+      const t = setTimeout(loop, 3000);
+      timeouts.push(t);
+    }
 
-    return () => clearInterval(interval);
-  }, [teams, status, theme, isMobile, selectedTimeWindow]);
+    // Initial animation
+    animateMessages();
+    // Start loop
+    loop();
+
+    // Cleanup: clear all timeouts and mark as stopped
+    return () => {
+      stopped = true;
+      timeouts.forEach(clearTimeout);
+      d3.select(svgRef.current).selectAll('*').remove();
+    };
+  }, [teams, status, theme, isMobile, selectedTimeWindow, isVisible]); 
 
   return (
     <>
