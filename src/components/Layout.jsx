@@ -1,5 +1,5 @@
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -54,7 +54,9 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
     <nav className={`${currentTheme.cardBackground} border-b ${currentTheme.border} px-4 py-3`}>
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>🛡️ Attack-Defense CTF</h1>
+          <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+            <a href="/">🛡️ Attack-Defense CTF</a>
+          </h1>
         </div>
 
         {/* Desktop Navigation */}
@@ -67,7 +69,7 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
             onClick={toggleTheme}
             className={`rounded-lg px-3 py-1 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
 
@@ -75,9 +77,9 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
         <div className="flex items-center space-x-4 lg:hidden">
           <button
             onClick={toggleTheme}
-            className={`rounded-lg px-3 py-1 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
+            className={`rounded-lg p-2 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
@@ -112,7 +114,16 @@ const Footer = ({ currentTheme }) => (
   <footer className={`${currentTheme.cardBackground} border-t ${currentTheme.border} px-4 py-4`}>
     <div className="mx-auto flex max-w-7xl flex-col items-center justify-between space-y-2 text-sm sm:flex-row sm:space-y-0">
       <div className={currentTheme.textSecondary}>
-        <span>© 2025 CTF Visualization</span>
+        <span>
+          <a
+            href="https://github.com/hackintro/attack-defense-ui"
+            className="underline transition-opacity hover:opacity-80"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            © 2025 CTF Visualization{' '}
+          </a>
+        </span>
       </div>
       <div className={`flex items-center space-x-4 ${currentTheme.textSecondary}`}>
         <span>Made by ethan42 & deathwish24</span>
