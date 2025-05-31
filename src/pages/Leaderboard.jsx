@@ -7,12 +7,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import * as d3 from 'd3';
 import { useEffect, useState } from 'react';
+import { Chart } from 'react-google-charts';
 
 export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   const [teams, setTeams] = useState(null);
   const [status, setStatus] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
+
+  // Compute scores per window for each team
+  const [scoreHistory, setScoreHistory] = useState([]);
 
   useEffect(() => {
     // TODO: Replace with actual API call
@@ -141,6 +146,65 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
     setLeaderboardData(sortedTeams);
   }, [teams, status]);
 
+  useEffect(() => {
+    if (!teams || !status) return;
+
+    // Gather all windows
+    const allWindows = new Set();
+    for (const teamId in status) {
+      for (const window in status[teamId]) {
+        allWindows.add(parseInt(window));
+      }
+    }
+    const sortedWindows = Array.from(allWindows).sort((a, b) => a - b);
+
+    // Compute scores for each team at each window
+    const teamScores = {};
+    for (const teamId in status) {
+      teamScores[teamId] = [];
+      let cumulativeScore = 0;
+      for (const window of sortedWindows) {
+        const lastStatus = status[teamId][window];
+        if (!lastStatus) {
+          teamScores[teamId].push({ window, score: cumulativeScore });
+          continue;
+        }
+        let windowScore = 0;
+        for (const service in lastStatus) {
+          const serviceStatus = lastStatus[service];
+          if (serviceStatus.on) {
+            windowScore += 42;
+            windowScore += serviceStatus.teams_hit.length * 2;
+          } else {
+            windowScore -= serviceStatus.teams_hit.length * 2;
+          }
+        }
+        cumulativeScore += windowScore;
+        teamScores[teamId].push({ window, score: cumulativeScore });
+      }
+    }
+
+    // Find top 10 teams by latest score
+    const latestScores = Object.entries(teamScores).map(([teamId, arr]) => ({
+      teamId,
+      score: arr.length ? arr[arr.length - 1].score : 0,
+    }));
+    const top10 = latestScores
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map((t) => t.teamId);
+
+    // Only keep top 10 teams' score history
+    const filtered = top10.map((teamId) => ({
+      teamId,
+      teamName: teams[teamId],
+      color: d3.schemeCategory10[top10.indexOf(teamId) % 10],
+      values: teamScores[teamId],
+    }));
+
+    setScoreHistory(filtered);
+  }, [teams, status]);
+
   if (!teams || !status) {
     return (
       <main className="container mx-auto flex-1 px-4 py-6">
@@ -152,8 +216,20 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
       <div className="mb-6">
+        <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>Top 10 Teams</h2>
+        <p className={currentTheme.textSecondary}>
+          Score progression over time for the leading teams
+        </p>
+      </div>
+
+      {/* Line Chart for Top 10 Teams */}
+      <div className="mb-2 w-full overflow-x-auto">
+        <LineChart data={scoreHistory} currentTheme={currentTheme} />
+      </div>
+
+      <div className="mb-6">
         <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>Leaderboard</h2>
-        <p className={currentTheme.textSecondary}>Current team standings and performance metrics</p>
+        <p className={currentTheme.textSecondary}>Current team standings</p>
       </div>
 
       {/* Leaderboard Table */}
@@ -237,5 +313,99 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
         </div>
       </div>
     </main>
+  );
+}
+
+function LineChart({ data, currentTheme }) {
+  // Prepare columns: ['Window', 'Team 1', 'Team 2', ...]
+  const teamNames = data.map((team) => team.teamName);
+  const columns = ['Window', ...teamNames];
+
+  // Gather all windows
+  const allWindows = Array.from(new Set(data.flatMap((d) => d.values.map((v) => v.window)))).sort(
+    (a, b) => a - b
+  );
+
+  // Prepare rows: [window, team1score, team2score, ...]
+  const rows = allWindows.map((window) => {
+    const row = [window];
+    data.forEach((team) => {
+      const found = team.values.find((v) => v.window === window);
+      row.push(found ? found.score : null);
+    });
+    return row;
+  });
+
+  // Chart data
+  const chartData = [columns, ...rows];
+
+  // Chart options with proper theming
+  const options = {
+    curveType: 'function',
+    legend: {
+      position: 'top',
+      alignment: 'center',
+      textStyle: {
+        color: currentTheme.textPrimary === 'text-white' ? '#ffffff' : '#111827',
+        fontSize: 15,
+      },
+    },
+    chartArea: { left: 60, top: 60, width: '100%', height: '70%' },
+    hAxis: {
+      title: 'Window',
+      gridlines: {
+        count: 20,
+        color: currentTheme.textSecondary === 'text-gray-400' ? '#374151' : '#d1d5db',
+      },
+      viewWindow: { min: 0, max: 192 },
+      ticks: Array.from({ length: 20 }, (_, i) => i * 10),
+      titleTextStyle: {
+        color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280',
+      },
+      textStyle: { color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280' },
+      baselineColor: currentTheme.textSecondary === 'text-gray-400' ? '#4b5563' : '#9ca3af',
+    },
+    vAxis: {
+      title: 'Points',
+      gridlines: {
+        count: 8,
+        color: currentTheme.textSecondary === 'text-gray-400' ? '#374151' : '#d1d5db',
+      },
+      minValue: 0,
+      ticks: (() => {
+        const maxScore = Math.max(5000, ...data.flatMap((d) => d.values.map((v) => v.score)));
+        const arr = [];
+        for (let i = 0; i <= maxScore + 1; i += 5000) arr.push(i);
+        return arr;
+      })(),
+      titleTextStyle: {
+        color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280',
+      },
+      textStyle: { color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280' },
+      baselineColor: currentTheme.textSecondary === 'text-gray-400' ? '#4b5563' : '#9ca3af',
+    },
+    series: data.reduce((acc, team, idx) => {
+      acc[idx] = { color: team.color };
+      return acc;
+    }, {}),
+    backgroundColor: 'transparent',
+    fontName: 'inherit',
+    titleTextStyle: {
+      color: currentTheme.textPrimary === 'text-white' ? '#ffffff' : '#111827',
+      fontSize: 20,
+    },
+  };
+
+  return (
+    <div className="min-w-screen h-[520px] w-full">
+      <Chart
+        chartType="LineChart"
+        width="100%"
+        height="95%"
+        data={chartData}
+        options={options}
+        loader={<div>Loading Chart...</div>}
+      />
+    </div>
   );
 }
