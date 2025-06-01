@@ -92,35 +92,61 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   useEffect(() => {
     if (!teams || !status) return;
 
-    // Compute score per team (same logic as AttackDefenseCTFGraph)
+    // Compute score per team
     // Every window, each team gathers 42 points for each operational service.
-    // They lose 2 points for each team that hits them
-    // They gain 2 points for each team they hit
+    // They gain 2 points for each team they hit (regardless of service status)
+    // They lose 2 points for each team that hits them (calculated by scanning other teams)
     const scores = {};
     const serviceStats = {};
 
+    // Initialize scores and stats
     for (const teamId in status) {
-      const teamStatus = status[teamId];
       scores[teamId] = 0;
       serviceStats[teamId] = {
         operational: 0,
         attacks: 0,
         compromised: 0,
       };
+    }
+
+    // Calculate operational services and attacks
+    for (const teamId in status) {
+      const teamStatus = status[teamId];
 
       for (const timeWindow in teamStatus) {
         const lastStatus = teamStatus[timeWindow];
 
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
+          
+          // Add points for operational services
           if (serviceStatus.on) {
             scores[teamId] += 42;
-            scores[teamId] += serviceStatus.teams_hit.length * 2;
             serviceStats[teamId].operational += 1;
-            serviceStats[teamId].attacks += serviceStatus.teams_hit.length;
-          } else {
-            scores[teamId] -= serviceStatus.teams_hit.length * 2;
-            serviceStats[teamId].compromised += serviceStatus.teams_hit.length;
+          }
+          
+          // Add points for successful attacks (always, regardless of service status)
+          scores[teamId] += serviceStatus.teams_hit.length * 2;
+          serviceStats[teamId].attacks += serviceStatus.teams_hit.length;
+        }
+      }
+    }
+
+    // Calculate compromised services by scanning all teams
+    for (const attackerTeamId in status) {
+      const attackerStatus = status[attackerTeamId];
+      
+      for (const timeWindow in attackerStatus) {
+        const windowStatus = attackerStatus[timeWindow];
+        
+        for (const service in windowStatus) {
+          const serviceStatus = windowStatus[service];
+          
+          // For each team this team has hit
+          for (const victimTeamId of serviceStatus.teams_hit) {
+            // Deduct points from victim team
+            scores[victimTeamId] -= 2;
+            serviceStats[victimTeamId].compromised += 1;
           }
         }
       }
@@ -160,27 +186,64 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
 
     // Compute scores for each team at each window
     const teamScores = {};
+    
+    // Initialize team scores
     for (const teamId in status) {
       teamScores[teamId] = [];
-      let cumulativeScore = 0;
-      for (const window of sortedWindows) {
+    }
+
+    // Process each window sequentially
+    for (const window of sortedWindows) {
+      const windowScores = {};
+      
+      // Initialize window scores
+      for (const teamId in status) {
+        windowScores[teamId] = 0;
+      }
+      
+      // Calculate points for operational services and attacks
+      for (const teamId in status) {
         const lastStatus = status[teamId][window];
-        if (!lastStatus) {
-          teamScores[teamId].push({ window, score: cumulativeScore });
-          continue;
-        }
-        let windowScore = 0;
+        if (!lastStatus) continue;
+        
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
+          
+          // Points for operational services
           if (serviceStatus.on) {
-            windowScore += 42;
-            windowScore += serviceStatus.teams_hit.length * 2;
-          } else {
-            windowScore -= serviceStatus.teams_hit.length * 2;
+            windowScores[teamId] += 42;
+          }
+          
+          // Points for successful attacks (always added)
+          windowScores[teamId] += serviceStatus.teams_hit.length * 2;
+        }
+      }
+      
+      // Calculate points lost from being compromised
+      for (const attackerTeamId in status) {
+        const lastStatus = status[attackerTeamId][window];
+        if (!lastStatus) continue;
+        
+        for (const service in lastStatus) {
+          const serviceStatus = lastStatus[service];
+          
+          // Deduct points from each victim
+          for (const victimTeamId of serviceStatus.teams_hit) {
+            windowScores[victimTeamId] -= 2;
           }
         }
-        cumulativeScore += windowScore;
-        teamScores[teamId].push({ window, score: cumulativeScore });
+      }
+      
+      // Update cumulative scores
+      for (const teamId in status) {
+        const prevScore = teamScores[teamId].length > 0 
+          ? teamScores[teamId][teamScores[teamId].length - 1].score 
+          : 0;
+        
+        teamScores[teamId].push({
+          window,
+          score: prevScore + (windowScores[teamId] || 0)
+        });
       }
     }
 
