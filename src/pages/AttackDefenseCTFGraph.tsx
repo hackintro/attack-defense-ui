@@ -1,22 +1,73 @@
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { act, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdate }) {
-  const svgRef = useRef();
-  // const [nodes, setNodes] = useState(null);
-  const [teams, setTeams] = useState(null);
-  const [status, setStatus] = useState(null);
+interface Theme {
+  teamNameColor: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  cardBackground: string;
+  border: string;
+  svgBackground: string;
+}
+
+interface AttackDefenseCTFGraphProps {
+  theme?: string;
+  currentTheme: Theme;
+  onDataUpdate: (data: Date) => void;
+}
+
+interface TeamStatus {
+  on: number;
+  teams_hit: number[];
+}
+
+interface ServiceStatus {
+  [service: string]: TeamStatus;
+}
+
+interface TimeWindowStatus {
+  [window: string]: ServiceStatus;
+}
+
+interface TeamData {
+  [teamId: string]: string;
+}
+
+interface StatusData {
+  [teamId: string]: TimeWindowStatus;
+}
+
+interface NodeData {
+  x: number;
+  y: number;
+  color: string;
+  score: number;
+}
+
+interface MessageData {
+  srcId: string;
+  dstId: string;
+  color: string;
+}
+
+export default function AttackDefenseCTFGraph({
+  currentTheme,
+  onDataUpdate,
+}: AttackDefenseCTFGraphProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [teams, setTeams] = useState<TeamData | null>(null);
+  const [status, setStatus] = useState<StatusData | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
-  const [selectedTimeWindow, setSelectedTimeWindow] = useState(null);
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const windowsPerPage = 10;
   const [windowPage, setWindowPage] = useState(0);
 
-  // Track page visibility
   const [isVisible, setIsVisible] = useState(!document.hidden);
   useEffect(() => {
     const onVisibility = () => setIsVisible(!document.hidden);
@@ -24,24 +75,21 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  // Compute time windows and max window
-  const sampleTeamId = status !== null ? Object.keys(status)[0] : null;
-  const timeWindows =
-    sampleTeamId && status[sampleTeamId]
+  const sampleTeamId = status !== null ? (Object.keys(status)[0] ?? null) : null;
+  const timeWindows: number[] =
+    sampleTeamId && status?.[sampleTeamId]
       ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x))
       : [];
   const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
 
-  // Set default selected window to latest
   useEffect(() => {
     if (maxTimeWindow !== null && selectedTimeWindow === null) {
       setSelectedTimeWindow(maxTimeWindow);
-      setSearchParams({ window: maxTimeWindow });
+      setSearchParams({ window: maxTimeWindow.toString() });
       setWindowPage(Math.floor(maxTimeWindow / windowsPerPage));
     }
   }, [maxTimeWindow, selectedTimeWindow, setSearchParams]);
 
-  // Update windowPage if selectedTimeWindow changes (e.g., via URL)
   useEffect(() => {
     if (selectedTimeWindow !== null) {
       setWindowPage(Math.floor(selectedTimeWindow / windowsPerPage));
@@ -50,28 +98,22 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
 
   const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
 
-  // Calculate paginated windows
   const totalPages = Math.ceil(timeWindows.length / windowsPerPage);
   const pageStart = windowPage * windowsPerPage;
   const pageEnd = pageStart + windowsPerPage;
   const paginatedWindows = timeWindows.slice(pageStart, pageEnd);
 
-  console.log('Time Windows:', timeWindows);
-
-  console.log(timeWindows);
-  // const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
-  // const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
-
-  console.log(activeTimeWindow);
+  // console.log('Time Windows:', timeWindows);
+  // console.log(timeWindows);
+  // console.log(activeTimeWindow);
 
   useEffect(() => {
-    const windowFromURL = parseInt(searchParams.get('window'));
+    const windowFromURL = parseInt(searchParams.get('window') || '');
     if (!isNaN(windowFromURL)) {
       setSelectedTimeWindow(windowFromURL);
     }
   }, [searchParams]);
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -81,7 +123,6 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   }, []);
 
   useEffect(() => {
-    //  Uncomment below to fetch real data from API
     fetch('/status')
       .then((res) => res.json())
       .then((data) => {
@@ -97,15 +138,11 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
   useEffect(() => {
     if (!teams || !status) return;
 
-    // Compute score per team
-    const scores = {};
-    // Every window, each team gathers 42 points for each operational service.
-    // They lose 2 points for each team that hits them
-    // They gain 2 points for each team they hit
+    const scores: Record<string, number> = {};
     for (const teamId in status) {
       const teamStatus = status[teamId];
       for (const timeWindow in teamStatus) {
-        if (!(activeTimeWindow !== null && parseInt(timeWindow) <= activeTimeWindow)) continue; // Skip past time windows if activeTimeWindow is set
+        if (!(activeTimeWindow !== null && parseInt(timeWindow) <= activeTimeWindow)) continue;
         const lastStatus = teamStatus[timeWindow];
         if (!scores[teamId]) {
           scores[teamId] = 0;
@@ -113,15 +150,14 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
           if (serviceStatus.on) {
-            scores[teamId] += 42; // Each operational service gives 42 points
+            scores[teamId] += 42;
           }
-          scores[teamId] += serviceStatus.teams_hit.length * 2; // Each team hit gives 2 points
+          scores[teamId] += serviceStatus.teams_hit.length * 2;
           for (const otherTeamId in status) {
             if (
               otherTeamId !== teamId &&
               status[otherTeamId][timeWindow][service].teams_hit.includes(parseInt(teamId))
             ) {
-              // If another team hit this team, they lose 2 points
               scores[teamId] -= 2;
             }
           }
@@ -130,13 +166,13 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
     }
     console.log('Scores:', scores);
 
-    // Get dynamic dimensions from the SVG container
     const svgElement = svgRef.current;
-    const containerRect = svgElement.parentElement.getBoundingClientRect();
+    if (!svgElement) return;
+    const containerRect = svgElement.parentElement?.getBoundingClientRect();
+    if (!containerRect) return;
     const width = containerRect.width;
     const height = containerRect.height;
 
-    // Use larger canvas for mobile to enable zooming/panning
     const canvasWidth = isMobile ? Math.max(width * 2, 1200) : width;
     const canvasHeight = isMobile ? Math.max(height * 2, 800) : height;
 
@@ -146,29 +182,22 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
       .attr('height', height)
       .attr('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
 
-    // Remove all previous SVG content
     d3.select(svgRef.current).selectAll('*').remove();
 
-    // Create zoom behavior
     const zoom = d3
-      .zoom()
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 3])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
 
-    // Apply zoom to SVG
-    svg.call(zoom);
+    (svg as any).call(zoom);
 
-    // Create a group for all content that will be zoomed/panned
     const g = svg.append('g');
 
-    // Define nodes and messages
-    // Let's position nodes in a circular layout for better visibility
-    // first compute the x,y coordinates for each node
     const cx = canvasWidth / 2,
-      cy = canvasHeight / 2; // Center of the circle
-    const r = Math.min(canvasWidth, canvasHeight) / 3; // Radius of the circle, responsive to container size
+      cy = canvasHeight / 2;
+    const r = Math.min(canvasWidth, canvasHeight) / 3;
     const team_ids = Object.keys(teams);
     const points = team_ids.map((id, i) => {
       const angle = (2 * Math.PI * i) / team_ids.length;
@@ -178,7 +207,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         y: cy + r * Math.sin(angle),
       };
     });
-    const nodes = {};
+    const nodes: Record<string, NodeData> = {};
     points.forEach((point, i) => {
       nodes[point.id] = {
         x: point.x,
@@ -188,17 +217,15 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
       };
     });
 
-    // Example status message:
-    // {"1":{"0":{"mapflix":{"on":1,"teams_hit":[2,3,4]},"powerball":{"on":1,"teams_hit":[2,3,4]},"bananananana":{"on":1,"teams_hit":[2,3,4]},"auth":{"on":1,"teams_hit":[2,3,4]},"muzac":{"on":1,"teams_hit":[2,3,4]},"pwnazon":{"on":1,"teams_hit":[2,3,4]}},"1":{"mapflix":{"on":1,"teams_hit":[2,3,4]},"powerball":{"on":1,"teams_hit":[2,3,4]},"bananananana":{"on":1,"teams_hit":[2,3,4]},"auth":{"on":1,"teams_hit":[2,3,4]},"muzac":{"on":1,"teams_hit":[2,3,4]},"pwnazon":{"on":1,"teams_hit":[2,3,4]}},"2":{"mapflix":{"on":1,"teams_hit":[2,3,4]},"powerball":{"on":1,"teams_hit":[2,3,4]},"bananananana":{"on":1,"teams_hit":[2,3,4]},"auth":{"on":1,"teams_hit":[2,3,4]},"muzac":{"on":1,"teams_hit":[2,3,4]},"pwnazon":{"on":1,"teams_hit":[2,3,4]}},"3":{"mapflix":{"on":1,"teams_hit":[2,3,4]},"powerball":{"on":1,"teams_hit":[2,3,4]},"bananananana":{"on":1,"teams_hit":[2,3,4]},"auth":{"on":1,"teams_hit":[2,3,4]},"muzac":{"on":1,"teams_hit":[2,3,4]},"pwnazon":{"on":1,"teams_hit":[2,3,4]}}},"2":{"0":{"mapflix":{"on":1,"teams_hit":[1,3,4]},"powerball":{"on":1,"teams_hit":[1,3,4]},"bananananana":{"on":1,"teams_hit":[1,3,4]},"auth":{"on":1,"teams_hit":[1,3,4]},"muzac":{"on":1,"teams_hit":[1,3,4]},"pwnazon":{"on":1,"teams_hit":[1,3,4]}},"1":{"mapflix":{"on":1,"teams_hit":[1,3,4]},"powerball":{"on":1,"teams_hit":[1,3,4]},"bananananana":{"on":1,"teams_hit":[1,3,4]},"auth":{"on":1,"teams_hit":[1,3,4]},"muzac":{"on":1,"teams_hit":[1,3,4]},"pwnazon":{"on":1,"teams_hit":[1,3,4]}},"2":{"mapflix":{"on":1,"teams_hit":[1,3,4]},"powerball":{"on":1,"teams_hit":[1,3,4]},"bananananana":{"on":1,"teams_hit":[1,3,4]},"auth":{"on":1,"teams_hit":[1,3,4]},"muzac":{"on":1,"teams_hit":[1,3,4]},"pwnazon":{"on":1,"teams_hit":[1,3,4]}},"3":{"mapflix":{"on":1,"teams_hit":[1,3,4]},"powerball":{"on":1,"teams_hit":[1,3,4]},"bananananana":{"on":1,"teams_hit":[1,3,4]},"auth":{"on":1,"teams_hit":[1,3,4]},"muzac":{"on":1,"teams_hit":[1,3,4]},"pwnazon":{"on":1,"teams_hit":[1,3,4]}}},"3":{"0":{"mapflix":{"on":1,"teams_hit":[1,2,4]},"powerball":{"on":1,"teams_hit":[1,2,4]},"bananananana":{"on":1,"teams_hit":[1,2,4]},"auth":{"on":1,"teams_hit":[1,2,4]},"muzac":{"on":1,"teams_hit":[1,2,4]},"pwnazon":{"on":1,"teams_hit":[1,2,4]}},"1":{"mapflix":{"on":1,"teams_hit":[1,2,4]},"powerball":{"on":1,"teams_hit":[1,2,4]},"bananananana":{"on":1,"teams_hit":[1,2,4]},"auth":{"on":1,"teams_hit":[1,2,4]},"muzac":{"on":1,"teams_hit":[1,2,4]},"pwnazon":{"on":1,"teams_hit":[1,2,4]}},"2":{"mapflix":{"on":1,"teams_hit":[1,2,4]},"powerball":{"on":1,"teams_hit":[1,2,4]},"bananananana":{"on":1,"teams_hit":[1,2,4]},"auth":{"on":1,"teams_hit":[1,2,4]},"muzac":{"on":1,"teams_hit":[1,2,4]},"pwnazon":{"on":1,"teams_hit":[1,2,4]}},"3":{"mapflix":{"on":1,"teams_hit":[1,2,4]},"powerball":{"on":1,"teams_hit":[1,2,4]},"bananananana":{"on":1,"teams_hit":[1,2,4]},"auth":{"on":1,"teams_hit":[1,2,4]},"muzac":{"on":1,"teams_hit":[1,2,4]},"pwnazon":{"on":1,"teams_hit":[1,2,4]}}},"4":{"0":{"mapflix":{"on":1,"teams_hit":[1,2,3]},"powerball":{"on":1,"teams_hit":[1,2,3]},"bananananana":{"on":1,"teams_hit":[1,2,3]},"auth":{"on":1,"teams_hit":[1,2,3]},"muzac":{"on":1,"teams_hit":[1,2,3]},"pwnazon":{"on":1,"teams_hit":[1,2,3]}},"1":{"mapflix":{"on":1,"teams_hit":[1,2,3]},"powerball":{"on":1,"teams_hit":[1,2,3]},"bananananana":{"on":1,"teams_hit":[1,2,3]},"auth":{"on":1,"teams_hit":[1,2,3]},"muzac":{"on":1,"teams_hit":[1,2,3]},"pwnazon":{"on":1,"teams_hit":[1,2,3]}},"2":{"mapflix":{"on":1,"teams_hit":[1,2,3]},"powerball":{"on":1,"teams_hit":[1,2,3]},"bananananana":{"on":1,"teams_hit":[1,2,3]},"auth":{"on":1,"teams_hit":[1,2,3]},"muzac":{"on":1,"teams_hit":[1,2,3]},"pwnazon":{"on":1,"teams_hit":[1,2,3]}},"3":{"mapflix":{"on":1,"teams_hit":[1,2,3]},"powerball":{"on":1,"teams_hit":[1,2,3]},"bananananana":{"on":1,"teams_hit":[1,2,3]},"auth":{"on":1,"teams_hit":[1,2,3]},"muzac":{"on":1,"teams_hit":[1,2,3]},"pwnazon":{"on":1,"teams_hit":[1,2,3]}}}}
-    // for each team, we show the status for every time window for each service.
-    // When plotting we just need to plot the status at the last time window.
+    const firstTeamId = Object.keys(status)[0];
+    const services =
+      activeTimeWindow !== null && firstTeamId
+        ? Object.keys(status[firstTeamId][activeTimeWindow])
+        : [];
+    // console.log('Services:', services);
+    const serviceColors = d3.scaleOrdinal<string>().domain(services).range(d3.schemeCategory10);
 
-    const services = activeTimeWindow !== null ? Object.keys(status[1][activeTimeWindow]) : [];
-    console.log('Services:', services);
-    // create a map from every service to a color
-    const serviceColors = d3.scaleOrdinal().domain(services).range(d3.schemeCategory10);
-
-    const messages = [];
+    const messages: MessageData[] = [];
 
     if (activeTimeWindow !== null) {
       for (const teamId in status) {
@@ -206,41 +233,42 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         const lastStatus = teamStatus[activeTimeWindow];
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
-          //if (serviceStatus.on) {
-          // For each service that is on, we create a message
           for (const team of serviceStatus.teams_hit) {
             const team_hit_id = team.toString();
-            const color = d3.color(serviceColors(service)).formatHex();
-            messages.push([teamId, team_hit_id, color]);
+            const color = d3.color(serviceColors(service))?.formatHex() || '#000';
+            messages.push({
+              srcId: teamId,
+              dstId: team_hit_id,
+              color: color,
+            });
           }
         }
       }
     }
 
     console.log('Messages:', messages);
-
     console.log('Nodes:', nodes);
 
-    // Render nodes - now in the zoomable group
-    Object.entries(nodes).forEach(([id, { x, y, color, score }]) => {
+    Object.entries(nodes).forEach(([id, node]) => {
+      const { x, y, color, score } = node;
       g.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
 
-      const labelOffset = 35; // Distance from node
+      const labelOffset = 35;
       const labelY = y < cy ? y - labelOffset : y + labelOffset;
       g.append('text')
         .attr('x', x)
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
-        .attr('fill', currentTheme.teamNameColor) // Use theme-based color
+        .attr('fill', currentTheme.teamNameColor)
         .attr('font-size', '14px')
         .attr('font-weight', '600')
         .attr('font-family', 'system-ui, -apple-system, sans-serif')
         .text(teams[id] + ' (' + (score || 0) + ')');
     });
 
-    const sendMessage = (src, dst, color) => {
+    const sendMessage = (src: NodeData, dst: NodeData, color: string) => {
       const lineGenerator = d3.line().curve(d3.curveBasis);
-      const curvePoints = [
+      const curvePoints: [number, number][] = [
         [src.x, src.y],
         [
           (src.x + dst.x) / 2 - ((0.5 - Math.random()) * canvasHeight) / 3,
@@ -252,7 +280,7 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
 
       const path = g.append('path').attr('fill', 'none').attr('stroke', 'none').attr('d', pathD);
 
-      const totalLength = path.node().getTotalLength();
+      const totalLength = path.node()?.getTotalLength() || 0;
 
       const trail = g
         .append('path')
@@ -267,15 +295,16 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         .duration(3000)
         .ease(d3.easeLinear)
         .tween('pathTween', () => {
-          return function (t) {
-            const point = path.node().getPointAtLength(t * totalLength);
-            dot.attr('cx', point.x).attr('cy', point.y);
+          return function (t: number) {
+            const point = path.node()?.getPointAtLength(t * totalLength);
+            if (point) {
+              dot.attr('cx', point.x).attr('cy', point.y);
+            }
             const trailLength = t * totalLength;
             trail.attr('d', pathD).attr('stroke-dasharray', `${trailLength},${totalLength}`);
           };
         })
         .on('end', () => {
-          // Explosion effect at destination
           const duration = 1000;
           const explosion = g
             .append('circle')
@@ -292,29 +321,25 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         });
     };
 
-    // Center the view initially for mobile
     if (isMobile) {
       const initialTransform = d3.zoomIdentity
         .translate((width - canvasWidth * 0.4) / 2, (height - canvasHeight * 0.4) / 2)
         .scale(1);
-      svg.call(zoom.transform, initialTransform);
+      svg.call(zoom.transform as any, initialTransform);
     }
 
-    // Store references to all timeouts for cleanup
-    const timeouts = [];
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
     let stopped = false;
 
-    // Helper to send all messages (returns array of timeout IDs)
     function animateMessages() {
       if (stopped) return;
-      messages.forEach(([srcId, dstId, color]) => {
-        const src = nodes[srcId];
-        const dst = nodes[dstId];
-        sendMessage(src, dst, color);
+      messages.forEach((msg) => {
+        const src = nodes[msg.srcId];
+        const dst = nodes[msg.dstId];
+        sendMessage(src, dst, msg.color);
       });
     }
 
-    // Animation loop using setTimeout for better control
     function loop() {
       if (stopped) return;
       animateMessages();
@@ -322,18 +347,15 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
       timeouts.push(t);
     }
 
-    // Initial animation
     animateMessages();
-    // Start loop
     loop();
 
-    // Cleanup: clear all timeouts and mark as stopped
     return () => {
       stopped = true;
       timeouts.forEach(clearTimeout);
       d3.select(svgRef.current).selectAll('*').remove();
     };
-  }, [teams, status, theme, isMobile, selectedTimeWindow, isVisible]); 
+  }, [teams, status, currentTheme, isMobile, selectedTimeWindow, isVisible]);
 
   return (
     <>
@@ -350,12 +372,10 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
         </div>
 
         <div className="mb-4 flex items-center justify-center">
-          {/* Time Window Selector */}
           {timeWindows.length > 0 && (
             <div className="flex flex-col items-center gap-2">
               <span className={`text-sm font-medium ${currentTheme.textSecondary}`}>Window</span>
               <div className="flex flex-wrap items-center gap-1">
-                {/* Left button */}
                 <button
                   onClick={() => setWindowPage((p) => Math.max(0, p - 1))}
                   disabled={windowPage === 0}
@@ -365,13 +385,12 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
                 >
                   <ChevronLeft size={16} />
                 </button>
-                {/* Window buttons */}
                 {paginatedWindows.map((tw) => (
                   <button
                     key={tw}
                     onClick={() => {
                       setSelectedTimeWindow(tw);
-                      setSearchParams({ window: tw });
+                      setSearchParams({ window: tw.toString() });
                     }}
                     className={`h-6 w-6 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} ${tw === activeTimeWindow ? 'ring-2 ring-white' : ''} hover:bg-gray-100`}
                     title={`Time Window ${tw}`}
@@ -393,11 +412,9 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
           )}
         </div>
 
-        {/* Full screen graph container with overlay scoring system */}
         <div className="relative h-[calc(100vh-200px)] w-full">
-          {/* Scoring System - Responsive positioning */}
           <div
-            className={`absolute ${isMobile ? 'left-2 top-2' : 'right-4 top-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
+            className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
           >
             <div
               className={`${currentTheme.cardBackground} rounded-lg border p-3 shadow-lg ${currentTheme.border} ${isMobile ? 'text-xs' : ''}`}
@@ -424,7 +441,6 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
             </div>
           </div>
 
-          {/* Mobile instructions */}
           {isMobile && (
             <div className="absolute bottom-4 left-4 z-10">
               <div
@@ -437,7 +453,6 @@ export default function AttackDefenseCTFGraph({ theme, currentTheme, onDataUpdat
             </div>
           )}
 
-          {/* Full screen SVG graph */}
           <div className={`h-full w-full ${currentTheme.cardBackground} rounded-lg`}>
             <svg
               ref={svgRef}

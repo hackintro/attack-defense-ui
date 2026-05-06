@@ -3,7 +3,34 @@ import { Menu, Moon, Sun } from 'lucide-react';
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
+interface Theme {
+  background: string;
+  cardBackground: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+}
+
+interface NavbarProps {
+  theme?: string;
+  toggleTheme: () => void;
+  currentTheme: Theme;
+  lastUpdateTime: Date | null;
+}
+
+interface FooterProps {
+  currentTheme: Theme;
+}
+
+interface LayoutProps {
+  children: React.ReactNode;
+  theme?: string;
+  toggleTheme: () => void;
+  currentTheme: Theme;
+  lastUpdateTime: Date | null;
+}
+
+const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }: NavbarProps) => {
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
@@ -55,7 +82,7 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center space-x-4">
           <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
-            <a href="/">🛡️ Attack-Defense CTF</a>
+            <a href="/">Attack-Defense CTF</a>
           </h1>
         </div>
 
@@ -67,7 +94,7 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
           </div>
           <button
             onClick={toggleTheme}
-            className={`rounded-lg px-3 py-1 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
+            className={`rounded-lg px-3 py-1 ${currentTheme.cardBackground} ${currentTheme.border} cursor-pointer border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -110,29 +137,45 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }) => {
   );
 };
 
-const Footer = ({ currentTheme }) => (
+const Footer = ({ currentTheme }: FooterProps) => (
   <footer className={`${currentTheme.cardBackground} border-t ${currentTheme.border} px-4 py-4`}>
     <div className="mx-auto flex max-w-7xl flex-col items-center justify-between space-y-2 text-sm sm:flex-row sm:space-y-0">
       <div className={currentTheme.textSecondary}>
         <span>
           <a
             href="https://github.com/hackintro/attack-defense-ui"
-            className="underline transition-opacity hover:opacity-80"
+            className="text-blue-500 transition-opacity hover:opacity-80"
             target="_blank"
-            rel="noopener noreferrer"
           >
-            © 2025 CTF Visualization{' '}
+            © 2026 CTF Visualization{' '}
           </a>
         </span>
       </div>
       <div className={`flex items-center space-x-4 ${currentTheme.textSecondary}`}>
-        <span>Made by ethan42 & deathwish24</span>
+        <span>
+          Made by{' '}
+          <a
+            href="https://github.com/ethan42"
+            target="_blank"
+            className="text-blue-500 hover:underline"
+          >
+            ethan42
+          </a>{' '}
+          &{' '}
+          <a
+            href="https://github.com/mgiannopoulos24"
+            target="_blank"
+            className="text-blue-500 hover:underline"
+          >
+            deathwish24
+          </a>
+        </span>
       </div>
     </div>
   </footer>
 );
 
-const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }) => {
+const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }: LayoutProps) => {
   return (
     <div className={`flex min-h-screen flex-col ${currentTheme.background}`}>
       <Navbar
@@ -154,7 +197,7 @@ const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }) 
           Join our Discord
         </a>
       </div>
-      <main className="flex-grow overflow-hidden">{children}</main>
+      <main className="grow overflow-hidden">{children}</main>
       <Footer currentTheme={currentTheme} />
     </div>
   );

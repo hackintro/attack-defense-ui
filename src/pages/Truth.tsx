@@ -1,8 +1,19 @@
 import reality from '@/assets/truth.mp4';
 import { useEffect, useRef, useState } from 'react';
 
-export default function Truth({ theme, currentTheme, onDataUpdate }) {
-  const videoRef = useRef(null);
+interface Theme {
+  svgBackground: string;
+  textSecondary: string;
+}
+
+interface TruthProps {
+  theme?: Theme;
+  currentTheme: Theme;
+  onDataUpdate: (data: Date) => void;
+}
+
+export default function Truth({ currentTheme, onDataUpdate }: TruthProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -18,7 +29,7 @@ export default function Truth({ theme, currentTheme, onDataUpdate }) {
 
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
-      <h1 className="mb-8 text-center text-2xl font-bold italic text-red-500">
+      <h1 className="mb-8 text-center text-2xl font-bold text-red-500 italic">
         Is any of it real?
       </h1>
 

@@ -5,11 +5,21 @@ import Rules from './pages/Rules';
 import Truth from './pages/Truth';
 import { getCookie, setCookie } from './utils/cookies';
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
+interface Theme {
+  background: string;
+  cardBackground: string;
+  border: string;
+  svgBackground: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  teamNameColor: string;
+}
 
 export default function App() {
-  // Initialize theme from cookie immediately, or default to dark
-  const [theme, setTheme] = useState(() => {
+  const [theme, setTheme] = useState<string>(() => {
     if (typeof document !== 'undefined') {
       const savedTheme = getCookie('attack-defense-theme');
       return savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : 'dark';
@@ -17,10 +27,8 @@ export default function App() {
     return 'dark';
   });
 
-  // Add state for last update time
-  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
 
-  // Save theme to cookie when it changes
   useEffect(() => {
     setCookie('attack-defense-theme', theme, 7);
   }, [theme]);
@@ -29,8 +37,7 @@ export default function App() {
     setTheme((prevTheme) => (prevTheme === 'dark' ? 'light' : 'dark'));
   };
 
-  // Theme configuration
-  const themeConfig = {
+  const themeConfig: Record<string, Theme> = {
     dark: {
       background: 'bg-gray-950',
       cardBackground: 'bg-gray-800',
@@ -67,11 +74,7 @@ export default function App() {
               currentTheme={currentTheme}
               lastUpdateTime={lastUpdateTime}
             >
-              <AttackDefenseCTFGraph
-                theme={theme}
-                currentTheme={currentTheme}
-                onDataUpdate={setLastUpdateTime}
-              />
+              <AttackDefenseCTFGraph currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />
@@ -84,11 +87,7 @@ export default function App() {
               currentTheme={currentTheme}
               lastUpdateTime={lastUpdateTime}
             >
-              <Leaderboard
-                theme={theme}
-                currentTheme={currentTheme}
-                onDataUpdate={setLastUpdateTime}
-              />
+              <Leaderboard currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />
@@ -101,7 +100,7 @@ export default function App() {
               currentTheme={currentTheme}
               lastUpdateTime={lastUpdateTime}
             >
-              <Truth theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
+              <Truth currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />
@@ -114,7 +113,7 @@ export default function App() {
               currentTheme={currentTheme}
               lastUpdateTime={lastUpdateTime}
             >
-              <Rules theme={theme} currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
+              <Rules currentTheme={currentTheme} onDataUpdate={setLastUpdateTime} />
             </Layout>
           }
         />
