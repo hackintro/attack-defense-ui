@@ -11,16 +11,70 @@ import * as d3 from 'd3';
 import { useEffect, useState } from 'react';
 import { Chart } from 'react-google-charts';
 
-export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
-  const [teams, setTeams] = useState(null);
-  const [status, setStatus] = useState(null);
-  const [leaderboardData, setLeaderboardData] = useState([]);
+interface Theme {
+  cardBackground: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+}
 
-  // Compute scores per window for each team
-  const [scoreHistory, setScoreHistory] = useState([]);
+interface LeaderboardProps {
+  theme?: string;
+  currentTheme: Theme;
+  onDataUpdate: (data: Date) => void;
+}
+
+interface TeamStatus {
+  on: number;
+  teams_hit: number[];
+}
+
+interface ServiceStatus {
+  [service: string]: TeamStatus;
+}
+
+interface TimeWindowStatus {
+  [window: string]: ServiceStatus;
+}
+
+interface TeamData {
+  [teamId: string]: string;
+}
+
+interface StatusData {
+  [teamId: string]: TimeWindowStatus;
+}
+
+interface TeamScore {
+  rank: number;
+  teamId: string;
+  teamName: string;
+  score: number;
+  operational: number;
+  attacks: number;
+  compromised: number;
+}
+
+interface ScoreWindow {
+  window: number;
+  score: number;
+}
+
+interface ScoreHistoryEntry {
+  teamId: string;
+  teamName: string;
+  color: string;
+  values: ScoreWindow[];
+}
+
+export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardProps) {
+  const [teams, setTeams] = useState<TeamData | null>(null);
+  const [status, setStatus] = useState<StatusData | null>(null);
+  const [leaderboardData, setLeaderboardData] = useState<TeamScore[]>([]);
+
+  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryEntry[]>([]);
 
   useEffect(() => {
-    // TODO: Replace with actual API call
     fetch('/status')
       .then((response) => response.json())
       .then((data) => {
@@ -29,77 +83,18 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
         onDataUpdate(new Date());
       })
       .catch((error) => console.error('Error fetching status:', error));
-    /*
-    // Mock data for testing (same as AttackDefenseCTFGraph)
-    const mockData = {
-      teams: {
-        1: 'Team Alpha',
-        2: 'Team Beta',
-        3: 'Team Gamma',
-        4: 'Team Delta',
-      },
-      status: {
-        1: {
-          0: {
-            mapflix: { on: 1, teams_hit: [2, 3, 4] },
-            powerball: { on: 1, teams_hit: [2, 3, 4] },
-            bananananana: { on: 1, teams_hit: [2, 3, 4] },
-            auth: { on: 1, teams_hit: [2, 3, 4] },
-            muzac: { on: 1, teams_hit: [2, 3, 4] },
-            pwnazon: { on: 1, teams_hit: [2, 3, 4] },
-          },
-        },
-        2: {
-          0: {
-            mapflix: { on: 1, teams_hit: [1, 3, 4] },
-            powerball: { on: 1, teams_hit: [1, 3, 4] },
-            bananananana: { on: 1, teams_hit: [1, 3, 4] },
-            auth: { on: 1, teams_hit: [1, 3, 4] },
-            muzac: { on: 1, teams_hit: [1, 3, 4] },
-            pwnazon: { on: 1, teams_hit: [1, 3, 4] },
-          },
-        },
-        3: {
-          0: {
-            mapflix: { on: 1, teams_hit: [1, 2, 4] },
-            powerball: { on: 1, teams_hit: [1, 2, 4] },
-            bananananana: { on: 1, teams_hit: [1, 2, 4] },
-            auth: { on: 1, teams_hit: [1, 2, 4] },
-            muzac: { on: 1, teams_hit: [1, 2, 4] },
-            pwnazon: { on: 1, teams_hit: [1, 2, 4] },
-          },
-        },
-        4: {
-          0: {
-            mapflix: { on: 1, teams_hit: [1, 2, 3] },
-            powerball: { on: 1, teams_hit: [1, 2, 3] },
-            bananananana: { on: 1, teams_hit: [1, 2, 3] },
-            auth: { on: 1, teams_hit: [1, 2, 3] },
-            muzac: { on: 1, teams_hit: [1, 2, 3] },
-            pwnazon: { on: 1, teams_hit: [1, 2, 3] },
-          },
-        },
-      },
-    };
-
-    setTeams(mockData.teams);
-    setStatus(mockData.status);
-
-*/
     onDataUpdate(new Date());
   }, [onDataUpdate]);
 
   useEffect(() => {
     if (!teams || !status) return;
 
-    // Compute score per team
-    // Every window, each team gathers 42 points for each operational service.
-    // They gain 2 points for each team they hit (regardless of service status)
-    // They lose 2 points for each team that hits them (calculated by scanning other teams)
-    const scores = {};
-    const serviceStats = {};
+    const scores: Record<string, number> = {};
+    const serviceStats: Record<
+      string,
+      { operational: number; attacks: number; compromised: number }
+    > = {};
 
-    // Initialize scores and stats
     for (const teamId in status) {
       scores[teamId] = 0;
       serviceStats[teamId] = {
@@ -109,7 +104,6 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
       };
     }
 
-    // Calculate operational services and attacks
     for (const teamId in status) {
       const teamStatus = status[teamId];
 
@@ -118,33 +112,28 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
 
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
-          
-          // Add points for operational services
+
           if (serviceStatus.on) {
             scores[teamId] += 42;
             serviceStats[teamId].operational += 1;
           }
-          
-          // Add points for successful attacks (always, regardless of service status)
+
           scores[teamId] += serviceStatus.teams_hit.length * 2;
           serviceStats[teamId].attacks += serviceStatus.teams_hit.length;
         }
       }
     }
 
-    // Calculate compromised services by scanning all teams
     for (const attackerTeamId in status) {
       const attackerStatus = status[attackerTeamId];
-      
+
       for (const timeWindow in attackerStatus) {
         const windowStatus = attackerStatus[timeWindow];
-        
+
         for (const service in windowStatus) {
           const serviceStatus = windowStatus[service];
-          
-          // For each team this team has hit
+
           for (const victimTeamId of serviceStatus.teams_hit) {
-            // Deduct points from victim team
             scores[victimTeamId] -= 2;
             serviceStats[victimTeamId].compromised += 1;
           }
@@ -152,10 +141,9 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
       }
     }
 
-    // Convert to array and sort by score
     const sortedTeams = Object.entries(scores)
       .map(([teamId, score]) => ({
-        rank: 0, // Will be set after sorting
+        rank: 0,
         teamId,
         teamName: teams[teamId],
         score,
@@ -175,79 +163,68 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   useEffect(() => {
     if (!teams || !status) return;
 
-    // Gather all windows
-    const allWindows = new Set();
+    const allWindows = new Set<number>();
     for (const teamId in status) {
-      for (const window in status[teamId]) {
-        allWindows.add(parseInt(window));
+      for (const windowStr in status[teamId]) {
+        allWindows.add(parseInt(windowStr));
       }
     }
     const sortedWindows = Array.from(allWindows).sort((a, b) => a - b);
 
-    // Compute scores for each team at each window
-    const teamScores = {};
-    
-    // Initialize team scores
+    const teamScores: Record<string, ScoreWindow[]> = {};
+
     for (const teamId in status) {
       teamScores[teamId] = [];
     }
 
-    // Process each window sequentially
     for (const window of sortedWindows) {
-      const windowScores = {};
-      
-      // Initialize window scores
+      const windowScores: Record<string, number> = {};
+
       for (const teamId in status) {
         windowScores[teamId] = 0;
       }
-      
-      // Calculate points for operational services and attacks
+
       for (const teamId in status) {
         const lastStatus = status[teamId][window];
         if (!lastStatus) continue;
-        
+
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
-          
-          // Points for operational services
+
           if (serviceStatus.on) {
             windowScores[teamId] += 42;
           }
-          
-          // Points for successful attacks (always added)
+
           windowScores[teamId] += serviceStatus.teams_hit.length * 2;
         }
       }
-      
-      // Calculate points lost from being compromised
+
       for (const attackerTeamId in status) {
         const lastStatus = status[attackerTeamId][window];
         if (!lastStatus) continue;
-        
+
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
-          
-          // Deduct points from each victim
+
           for (const victimTeamId of serviceStatus.teams_hit) {
             windowScores[victimTeamId] -= 2;
           }
         }
       }
-      
-      // Update cumulative scores
+
       for (const teamId in status) {
-        const prevScore = teamScores[teamId].length > 0 
-          ? teamScores[teamId][teamScores[teamId].length - 1].score 
-          : 0;
-        
+        const prevScore =
+          teamScores[teamId].length > 0
+            ? teamScores[teamId][teamScores[teamId].length - 1].score
+            : 0;
+
         teamScores[teamId].push({
           window,
-          score: prevScore + (windowScores[teamId] || 0)
+          score: prevScore + (windowScores[teamId] || 0),
         });
       }
     }
 
-    // Find top 10 teams by latest score
     const latestScores = Object.entries(teamScores).map(([teamId, arr]) => ({
       teamId,
       score: arr.length ? arr[arr.length - 1].score : 0,
@@ -257,7 +234,6 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
       .slice(0, 10)
       .map((t) => t.teamId);
 
-    // Only keep top 10 teams' score history
     const filtered = top10.map((teamId) => ({
       teamId,
       teamName: teams[teamId],
@@ -285,7 +261,6 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
         </p>
       </div>
 
-      {/* Line Chart for Top 10 Teams */}
       <div className="mb-2 w-full overflow-x-auto">
         <LineChart data={scoreHistory} currentTheme={currentTheme} />
       </div>
@@ -295,7 +270,6 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
         <p className={currentTheme.textSecondary}>Current team standings</p>
       </div>
 
-      {/* Leaderboard Table */}
       <div
         className={`${currentTheme.cardBackground} rounded-lg border ${currentTheme.border} overflow-hidden`}
       >
@@ -349,7 +323,6 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
         </Table>
       </div>
 
-      {/* Scoring Legend */}
       <div
         className={`mt-6 ${currentTheme.cardBackground} rounded-lg border ${currentTheme.border} p-4`}
       >
@@ -379,19 +352,21 @@ export default function Leaderboard({ theme, currentTheme, onDataUpdate }) {
   );
 }
 
-function LineChart({ data, currentTheme }) {
-  // Prepare columns: ['Window', 'Team 1', 'Team 2', ...]
+interface LineChartProps {
+  data: ScoreHistoryEntry[];
+  currentTheme: Theme;
+}
+
+function LineChart({ data, currentTheme }: LineChartProps) {
   const teamNames = data.map((team) => team.teamName);
   const columns = ['Window', ...teamNames];
 
-  // Gather all windows
   const allWindows = Array.from(new Set(data.flatMap((d) => d.values.map((v) => v.window)))).sort(
     (a, b) => a - b
   );
 
-  // Prepare rows: [window, team1score, team2score, ...]
   const rows = allWindows.map((window) => {
-    const row = [window];
+    const row: (number | null)[] = [window];
     data.forEach((team) => {
       const found = team.values.find((v) => v.window === window);
       row.push(found ? found.score : null);
@@ -399,21 +374,19 @@ function LineChart({ data, currentTheme }) {
     return row;
   });
 
-  // Chart data
   const chartData = [columns, ...rows];
 
-  // Chart options with proper theming
   const options = {
-    curveType: 'function',
+    curveType: 'function' as const,
     legend: {
-      position: 'top',
-      alignment: 'center',
+      position: 'top' as const,
+      alignment: 'center' as const,
       textStyle: {
         color: currentTheme.textPrimary === 'text-white' ? '#ffffff' : '#111827',
         fontSize: 15,
       },
     },
-    chartArea: { left: 60, top: 60, width: '100%', height: '70%' },
+    chartArea: { left: 60, top: 60, width: '100%' as const, height: '70%' as const },
     hAxis: {
       title: 'Window',
       gridlines: {
@@ -437,7 +410,7 @@ function LineChart({ data, currentTheme }) {
       minValue: 0,
       ticks: (() => {
         const maxScore = Math.max(5000, ...data.flatMap((d) => d.values.map((v) => v.score)));
-        const arr = [];
+        const arr: number[] = [];
         for (let i = 0; i <= maxScore + 1; i += 5000) arr.push(i);
         return arr;
       })(),
@@ -447,12 +420,12 @@ function LineChart({ data, currentTheme }) {
       textStyle: { color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280' },
       baselineColor: currentTheme.textSecondary === 'text-gray-400' ? '#4b5563' : '#9ca3af',
     },
-    series: data.reduce((acc, team, idx) => {
+    series: data.reduce((acc: Record<number, { color: string }>, team, idx) => {
       acc[idx] = { color: team.color };
       return acc;
     }, {}),
-    backgroundColor: 'transparent',
-    fontName: 'inherit',
+    backgroundColor: 'transparent' as const,
+    fontName: 'inherit' as const,
     titleTextStyle: {
       color: currentTheme.textPrimary === 'text-white' ? '#ffffff' : '#111827',
       fontSize: 20,
@@ -460,7 +433,7 @@ function LineChart({ data, currentTheme }) {
   };
 
   return (
-    <div className="min-w-screen h-[520px] w-full">
+    <div className="h-[520px] w-full min-w-screen">
       <Chart
         chartType="LineChart"
         width="100%"

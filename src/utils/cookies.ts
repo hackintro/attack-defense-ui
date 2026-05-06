@@ -1,10 +1,10 @@
 /**
  * Set a cookie with expiration
- * @param {string} name - Cookie name
- * @param {string} value - Cookie value
- * @param {number} days - Days until expiration
+ * @param name - Cookie name
+ * @param value - Cookie value
+ * @param days - Days until expiration
  */
-export function setCookie(name, value, days = 7) {
+export function setCookie(name: string, value: string, days: number = 7): void {
   const date = new Date();
   date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
   const expires = 'expires=' + date.toUTCString();
@@ -14,11 +14,11 @@ export function setCookie(name, value, days = 7) {
 
 /**
  * Get a cookie value by name
- * @param {string} name - Cookie name
- * @returns {string|null} Cookie value or null if not found
+ * @param name - Cookie name
+ * @returns Cookie value or null if not found
  */
-export function getCookie(name) {
-  console.log('All cookies:', document.cookie); // Debug log
+export function getCookie(name: string): string | null {
+  // console.log('All cookies:', document.cookie);
   const nameEQ = name + '=';
   const ca = document.cookie.split(';');
   for (let i = 0; i < ca.length; i++) {
@@ -34,17 +34,17 @@ export function getCookie(name) {
 
 /**
  * Delete a cookie by name
- * @param {string} name - Cookie name
+ * @param name - Cookie name
  */
-export function deleteCookie(name) {
+export function deleteCookie(name: string): void {
   document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 }
 
 /**
  * Check if a cookie exists
- * @param {string} name - Cookie name
- * @returns {boolean} True if cookie exists
+ * @param name - Cookie name
+ * @returns True if cookie exists
  */
-export function cookieExists(name) {
+export function cookieExists(name: string): boolean {
   return getCookie(name) !== null;
 }
