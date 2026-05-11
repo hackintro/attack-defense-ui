@@ -1,131 +1,109 @@
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useTheme } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 import { Menu, Moon, Sun } from 'lucide-react';
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-interface Theme {
-  background: string;
-  cardBackground: string;
-  textPrimary: string;
-  textSecondary: string;
-  border: string;
-}
-
-interface NavbarProps {
-  theme?: string;
-  toggleTheme: () => void;
-  currentTheme: Theme;
-  lastUpdateTime: Date | null;
-}
-
-interface FooterProps {
-  currentTheme: Theme;
-}
-
 interface LayoutProps {
   children: React.ReactNode;
-  theme?: string;
-  toggleTheme: () => void;
-  currentTheme: Theme;
   lastUpdateTime: Date | null;
 }
 
-const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }: NavbarProps) => {
-  const location = useLocation();
-  const [sheetOpen, setSheetOpen] = React.useState(false);
+interface NavLinksProps {
+  mobile?: boolean;
+  onLinkClick?: () => void;
+}
 
-  const NavLinks = ({ mobile = false, onLinkClick = () => {} }) => (
-    <div className={`flex ${mobile ? 'flex-col space-y-4' : 'items-center space-x-6'}`}>
-      <Link
-        to="/"
-        onClick={() => {
-          onLinkClick();
-          if (mobile) setSheetOpen(false);
-        }}
-        className={`text-sm font-medium transition-colors hover:opacity-80 ${
-          location.pathname === '/' ? currentTheme.textPrimary : currentTheme.textSecondary
-        }`}
-      >
-        Live Graph
-      </Link>
-      <Link
-        to="/leaderboard"
-        onClick={() => {
-          onLinkClick();
-          if (mobile) setSheetOpen(false);
-        }}
-        className={`text-sm font-medium transition-colors hover:opacity-80 ${
-          location.pathname === '/leaderboard'
-            ? currentTheme.textPrimary
-            : currentTheme.textSecondary
-        }`}
-      >
-        Leaderboard
-      </Link>
-      <Link
-        to="/rules"
-        onClick={() => {
-          onLinkClick();
-          if (mobile) setSheetOpen(false);
-        }}
-        className={`text-sm font-medium transition-colors hover:opacity-80 ${
-          location.pathname === '/rules' ? currentTheme.textPrimary : currentTheme.textSecondary
-        }`}
-      >
-        Rules
-      </Link>
+const NAV_ITEMS: { to: string; label: string }[] = [
+  { to: '/', label: 'Live Graph' },
+  { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/rules', label: 'Rules' },
+];
+
+const NavLinks = ({ mobile = false, onLinkClick }: NavLinksProps) => {
+  const location = useLocation();
+  return (
+    <div className={mobile ? 'flex flex-col space-y-4' : 'flex items-center space-x-6'}>
+      {NAV_ITEMS.map(({ to, label }) => {
+        const active = location.pathname === to;
+        return (
+          <Link
+            key={to}
+            to={to}
+            onClick={onLinkClick}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'text-sm font-medium transition-colors hover:opacity-80',
+              active ? 'text-foreground' : 'text-muted-foreground'
+            )}
+          >
+            {label}
+          </Link>
+        );
+      })}
     </div>
   );
+};
+
+interface NavbarProps {
+  lastUpdateTime: Date | null;
+}
+
+const Navbar = ({ lastUpdateTime }: NavbarProps) => {
+  const { theme, toggleTheme } = useTheme();
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const isDark = theme === 'dark';
+  const themeLabel = isDark ? 'Switch to light theme' : 'Switch to dark theme';
 
   return (
-    <nav className={`${currentTheme.cardBackground} border-b ${currentTheme.border} px-4 py-3`}>
+    <nav className="bg-card border-border border-b px-4 py-3">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className={`text-xl font-bold ${currentTheme.textPrimary}`}>
+          <h1 className="text-foreground text-xl font-bold">
             <a href="/">Attack-Defense CTF</a>
           </h1>
         </div>
 
-        {/* Desktop Navigation */}
+        {/* Desktop */}
         <div className="hidden lg:flex lg:items-center lg:space-x-6">
           <NavLinks />
-          <div className={`${currentTheme.textSecondary} hidden text-sm xl:block`}>
+          <div className="text-muted-foreground hidden text-sm xl:block">
             Last Update: {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Never'}
           </div>
           <button
             onClick={toggleTheme}
-            className={`rounded-lg px-3 py-1 ${currentTheme.cardBackground} ${currentTheme.border} cursor-pointer border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
+            aria-label={themeLabel}
+            aria-pressed={isDark}
+            className="bg-card border-border text-foreground cursor-pointer rounded-lg border px-3 py-1 text-sm transition-opacity hover:opacity-80"
           >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile */}
         <div className="flex items-center space-x-4 lg:hidden">
           <button
             onClick={toggleTheme}
-            className={`rounded-lg p-2 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
+            aria-label={themeLabel}
+            aria-pressed={isDark}
+            className="bg-card border-border text-foreground rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
           >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <button
-                className={`rounded-lg p-2 ${currentTheme.cardBackground} ${currentTheme.border} border ${currentTheme.textPrimary} text-sm transition-opacity hover:opacity-80`}
+                className="bg-card border-border text-foreground rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
                 aria-label="Open navigation menu"
               >
                 <Menu size={18} />
               </button>
             </SheetTrigger>
-            <SheetContent
-              side="right"
-              className={`${currentTheme.cardBackground} border-l ${currentTheme.border} [&>button]:${theme === 'dark' ? 'text-white' : 'text-black'}`}
-            >
+            <SheetContent side="right" className="bg-card border-border border-l">
               <div className="mt-6">
-                <NavLinks mobile onLinkClick={() => {}} />
-                <div
-                  className={`mt-6 border-t pt-6 ${currentTheme.border} ${currentTheme.textSecondary} text-sm`}
-                >
+                <NavLinks mobile onLinkClick={() => setSheetOpen(false)} />
+                <div className="border-border text-muted-foreground mt-6 border-t pt-6 text-sm">
                   Last Update: {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Never'}
                 </div>
               </div>
@@ -137,70 +115,69 @@ const Navbar = ({ theme, toggleTheme, currentTheme, lastUpdateTime }: NavbarProp
   );
 };
 
-const Footer = ({ currentTheme }: FooterProps) => (
-  <footer className={`${currentTheme.cardBackground} border-t ${currentTheme.border} px-4 py-4`}>
-    <div className="mx-auto flex max-w-7xl flex-col items-center justify-between space-y-2 text-sm sm:flex-row sm:space-y-0">
-      <div className={currentTheme.textSecondary}>
-        <span>
-          <a
-            href="https://github.com/hackintro/attack-defense-ui"
-            className="text-blue-500 transition-opacity hover:opacity-80"
-            target="_blank"
-          >
-            © 2026 CTF Visualization{' '}
-          </a>
-        </span>
-      </div>
-      <div className={`flex items-center space-x-4 ${currentTheme.textSecondary}`}>
-        <span>
-          Made by{' '}
-          <a
-            href="https://github.com/ethan42"
-            target="_blank"
-            className="text-blue-500 hover:underline"
-          >
-            ethan42
-          </a>{' '}
-          &{' '}
-          <a
-            href="https://github.com/mgiannopoulos24"
-            target="_blank"
-            className="text-blue-500 hover:underline"
-          >
-            deathwish24
-          </a>
-        </span>
-      </div>
+const Footer = () => (
+  <footer className="bg-card border-border border-t px-4 py-4">
+    <div className="text-muted-foreground mx-auto flex max-w-7xl flex-col items-center justify-between space-y-2 text-sm sm:flex-row sm:space-y-0">
+      <span>
+        <a
+          href="https://github.com/hackintro/attack-defense-ui"
+          className="text-primary transition-opacity hover:opacity-80"
+          target="_blank"
+          rel="noreferrer"
+        >
+          © 2026 CTF Visualization
+        </a>
+      </span>
+      <span>
+        Made by{' '}
+        <a
+          href="https://github.com/ethan42"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary hover:underline"
+        >
+          ethan42
+        </a>
+        ,{' '}
+        <a
+          href="https://github.com/mgiannopoulos24"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary hover:underline"
+        >
+          deathwish24
+        </a>{' '}
+        &{' '}
+        <a
+          href="https://github.com/TR1LON"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary hover:underline"
+        >
+          TRiLON
+        </a>
+      </span>
     </div>
   </footer>
 );
 
-const Layout = ({ children, theme, toggleTheme, currentTheme, lastUpdateTime }: LayoutProps) => {
-  return (
-    <div className={`flex min-h-screen flex-col ${currentTheme.background}`}>
-      <Navbar
-        theme={theme}
-        toggleTheme={toggleTheme}
-        currentTheme={currentTheme}
-        lastUpdateTime={lastUpdateTime}
-      />
-      <div
-        className={`top-16 z-50 mx-auto w-full px-4 py-2 text-right text-sm ${currentTheme.textPrimary} transition-all duration-300`}
+const Layout = ({ children, lastUpdateTime }: LayoutProps) => (
+  <div className="bg-background flex min-h-screen flex-col">
+    <Navbar lastUpdateTime={lastUpdateTime} />
+    <div className="text-foreground top-16 z-50 mx-auto w-full px-4 py-2 text-right text-sm">
+      Stuck?{' '}
+      <a
+        href="https://discord.gg/C9NpWw4wqE"
+        className="underline transition-opacity hover:opacity-80"
+        target="_blank"
+        rel="noopener noreferrer"
       >
-        Stuck?{' '}
-        <a
-          href="https://discord.gg/C9NpWw4wqE "
-          className="underline transition-opacity hover:opacity-80"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Join our Discord
-        </a>
-      </div>
-      <main className="grow overflow-hidden">{children}</main>
-      <Footer currentTheme={currentTheme} />
+        Join our Discord
+      </a>
     </div>
-  );
-};
+    <main className="grow overflow-hidden">{children}</main>
+    <Footer />
+  </div>
+);
 
 export default Layout;

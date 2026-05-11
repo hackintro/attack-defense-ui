@@ -7,72 +7,48 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  type StatusData,
+  type TeamData,
+  type TeamScoreRow,
+  type TeamSeries,
+  computeScoreSeries,
+  rankTeams,
+  topNSeries,
+} from '@/lib/scoring';
+import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
-import { useEffect, useState, useRef } from 'react';
-import Plotly from 'plotly.js';
-
-interface Theme {
-  cardBackground: string;
-  textPrimary: string;
-  textSecondary: string;
-  border: string;
-}
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface LeaderboardProps {
-  theme?: string;
-  currentTheme: Theme;
   onDataUpdate: (data: Date) => void;
 }
 
-interface TeamStatus {
-  on: number;
-  teams_hit: number[];
-}
-
-interface ServiceStatus {
-  [service: string]: TeamStatus;
-}
-
-interface TimeWindowStatus {
-  [window: string]: ServiceStatus;
-}
-
-interface TeamData {
-  [teamId: string]: string;
-}
-
-interface StatusData {
-  [teamId: string]: TimeWindowStatus;
-}
-
-interface TeamScore {
+interface RankedTeam extends TeamScoreRow {
   rank: number;
-  teamId: string;
-  teamName: string;
-  score: number;
-  operational: number;
-  attacks: number;
-  compromised: number;
 }
 
-interface ScoreWindow {
-  window: number;
-  score: number;
+/**
+ * Medal styling for ranks 1-3. Gold / silver / bronze with a soft outer
+ * glow so they pop on the dark Cyber Noir surface (and still read on light).
+ * Ranks 4+ get a neutral outlined badge.
+ */
+function rankMedalClasses(rank: number): string {
+  switch (rank) {
+    case 1:
+      return 'bg-yellow-400 text-yellow-950 ring-2 ring-yellow-300 shadow-md shadow-yellow-500/40';
+    case 2:
+      return 'bg-slate-300 text-slate-900 ring-2 ring-slate-200 shadow-md shadow-slate-400/40';
+    case 3:
+      return 'bg-amber-700 text-amber-50 ring-2 ring-amber-600 shadow-md shadow-amber-800/40';
+    default:
+      return 'border-border text-muted-foreground border';
+  }
 }
 
-interface ScoreHistoryEntry {
-  teamId: string;
-  teamName: string;
-  color: string;
-  values: ScoreWindow[];
-}
-
-export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardProps) {
+export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
-  const [leaderboardData, setLeaderboardData] = useState<TeamScore[]>([]);
-
-  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryEntry[]>([]);
 
   useEffect(() => {
     fetch('/status')
@@ -83,171 +59,28 @@ export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardP
         onDataUpdate(new Date());
       })
       .catch((error) => console.error('Error fetching status:', error));
-    onDataUpdate(new Date());
   }, [onDataUpdate]);
 
-  useEffect(() => {
-    if (!teams || !status) return;
+  const leaderboardData = useMemo<RankedTeam[]>(
+    () => (teams && status ? (rankTeams(status, teams) as RankedTeam[]) : []),
+    [teams, status]
+  );
 
-    const scores: Record<string, number> = {};
-    const serviceStats: Record<
-      string,
-      { operational: number; attacks: number; compromised: number }
-    > = {};
-
-    for (const teamId in status) {
-      scores[teamId] = 0;
-      serviceStats[teamId] = {
-        operational: 0,
-        attacks: 0,
-        compromised: 0,
-      };
-    }
-
-    for (const teamId in status) {
-      const teamStatus = status[teamId];
-
-      for (const timeWindow in teamStatus) {
-        const lastStatus = teamStatus[timeWindow];
-
-        for (const service in lastStatus) {
-          const serviceStatus = lastStatus[service];
-
-          if (serviceStatus.on) {
-            scores[teamId] += 42;
-            serviceStats[teamId].operational += 1;
-          }
-
-          scores[teamId] += serviceStatus.teams_hit.length * 2;
-          serviceStats[teamId].attacks += serviceStatus.teams_hit.length;
-        }
-      }
-    }
-
-    for (const attackerTeamId in status) {
-      const attackerStatus = status[attackerTeamId];
-
-      for (const timeWindow in attackerStatus) {
-        const windowStatus = attackerStatus[timeWindow];
-
-        for (const service in windowStatus) {
-          const serviceStatus = windowStatus[service];
-
-          for (const victimTeamId of serviceStatus.teams_hit) {
-            scores[victimTeamId] -= 2;
-            serviceStats[victimTeamId].compromised += 1;
-          }
-        }
-      }
-    }
-
-    const sortedTeams = Object.entries(scores)
-      .map(([teamId, score]) => ({
-        rank: 0,
-        teamId,
-        teamName: teams[teamId],
-        score,
-        operational: serviceStats[teamId].operational,
-        attacks: serviceStats[teamId].attacks,
-        compromised: serviceStats[teamId].compromised,
-      }))
-      .sort((a, b) => b.score - a.score)
-      .map((team, index) => ({
-        ...team,
-        rank: index + 1,
-      }));
-
-    setLeaderboardData(sortedTeams);
-  }, [teams, status]);
-
-  useEffect(() => {
-    if (!teams || !status) return;
-
-    const allWindows = new Set<number>();
-    for (const teamId in status) {
-      for (const windowStr in status[teamId]) {
-        allWindows.add(parseInt(windowStr));
-      }
-    }
-    const sortedWindows = Array.from(allWindows).sort((a, b) => a - b);
-
-    const teamScores: Record<string, ScoreWindow[]> = {};
-
-    for (const teamId in status) {
-      teamScores[teamId] = [];
-    }
-
-    for (const window of sortedWindows) {
-      const windowScores: Record<string, number> = {};
-
-      for (const teamId in status) {
-        windowScores[teamId] = 0;
-      }
-
-      for (const teamId in status) {
-        const lastStatus = status[teamId][window];
-        if (!lastStatus) continue;
-
-        for (const service in lastStatus) {
-          const serviceStatus = lastStatus[service];
-
-          if (serviceStatus.on) {
-            windowScores[teamId] += 42;
-          }
-
-          windowScores[teamId] += serviceStatus.teams_hit.length * 2;
-        }
-      }
-
-      for (const attackerTeamId in status) {
-        const lastStatus = status[attackerTeamId][window];
-        if (!lastStatus) continue;
-
-        for (const service in lastStatus) {
-          const serviceStatus = lastStatus[service];
-
-          for (const victimTeamId of serviceStatus.teams_hit) {
-            windowScores[victimTeamId] -= 2;
-          }
-        }
-      }
-
-      for (const teamId in status) {
-        const prevScore =
-          teamScores[teamId].length > 0
-            ? teamScores[teamId][teamScores[teamId].length - 1].score
-            : 0;
-
-        teamScores[teamId].push({
-          window,
-          score: prevScore + (windowScores[teamId] || 0),
-        });
-      }
-    }
-
-    const latestScores = Object.entries(teamScores).map(([teamId, arr]) => ({
-      teamId,
-      score: arr.length ? arr[arr.length - 1].score : 0,
-    }));
-    const top10 = latestScores
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10)
-      .map((t) => t.teamId);
-
-    const filtered = top10.map((teamId) => ({
-      teamId,
-      teamName: teams[teamId],
-      color: d3.schemeCategory10[top10.indexOf(teamId) % 10],
-      values: teamScores[teamId],
-    }));
-
-    setScoreHistory(filtered);
+  const scoreHistory = useMemo<TeamSeries[]>(() => {
+    if (!teams || !status) return [];
+    const series = computeScoreSeries(status, teams);
+    const top = topNSeries(series, 10);
+    return top.map((s, i) => ({
+      ...s,
+      // attach a stable D3 categorical color for the chart legend
+      color: d3.schemeCategory10[i % 10],
+    })) as TeamSeries[];
   }, [teams, status]);
 
   if (!teams || !status) {
     return (
       <main className="container mx-auto flex-1 px-4 py-6">
-        <div className={`text-center ${currentTheme.textSecondary}`}>Loading leaderboard...</div>
+        <div className="text-muted-foreground text-center">Loading leaderboard...</div>
       </main>
     );
   }
@@ -255,31 +88,27 @@ export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardP
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
       <div className="mb-6">
-        <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>Top 10 Teams</h2>
-        <p className={currentTheme.textSecondary}>
-          Score progression over time for the leading teams
-        </p>
+        <h2 className="text-foreground mb-2 text-2xl font-bold">Top 10 Teams</h2>
+        <p className="text-muted-foreground">Score progression over time for the leading teams</p>
       </div>
 
       <div className="mb-2 w-full overflow-x-auto">
-        <LineChart data={scoreHistory} currentTheme={currentTheme} />
+        <LineChart data={scoreHistory} />
       </div>
 
       <div className="mb-6">
-        <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>Leaderboard</h2>
-        <p className={currentTheme.textSecondary}>Current team standings</p>
+        <h2 className="text-foreground mb-2 text-2xl font-bold">Leaderboard</h2>
+        <p className="text-muted-foreground">Current team standings</p>
       </div>
 
-      <div
-        className={`${currentTheme.cardBackground} rounded-lg border ${currentTheme.border} overflow-hidden`}
-      >
+      <div className="bg-card border-border overflow-hidden rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className={`${currentTheme.textPrimary}`}>Rank</TableHead>
-              <TableHead className={`${currentTheme.textPrimary}`}>Team</TableHead>
-              <TableHead className={`text-right ${currentTheme.textPrimary}`}>Score</TableHead>
-              <TableHead className={`text-right ${currentTheme.textPrimary}`}>Attacks</TableHead>
+              <TableHead className="text-foreground">Rank</TableHead>
+              <TableHead className="text-foreground">Team</TableHead>
+              <TableHead className="text-foreground text-right">Score</TableHead>
+              <TableHead className="text-foreground text-right">Attacks</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -288,32 +117,21 @@ export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardP
                 <TableCell>
                   <div className="flex items-center">
                     <span
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                        team.rank === 1
-                          ? 'bg-yellow-500 text-white'
-                          : team.rank === 2
-                            ? 'bg-gray-400 text-white'
-                            : team.rank === 3
-                              ? 'bg-amber-600 text-white'
-                              : `${currentTheme.border} border ${currentTheme.textSecondary}`
-                      }`}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${rankMedalClasses(
+                        team.rank
+                      )}`}
                     >
                       {team.rank}
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className={`font-medium ${currentTheme.textPrimary}`}>
-                  {team.teamName}
-                </TableCell>
-                <TableCell className={`text-right font-semibold ${currentTheme.textPrimary}`}>
+                <TableCell className="text-foreground font-medium">{team.teamName}</TableCell>
+                <TableCell className="text-foreground text-right font-semibold">
                   {team.score.toLocaleString()}
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <Badge
-                    variant="secondary"
-                    className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                  >
+                  <Badge variant="secondary" className="bg-info/15 text-info border-info/30 border">
                     {team.attacks}
                   </Badge>
                 </TableCell>
@@ -323,27 +141,25 @@ export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardP
         </Table>
       </div>
 
-      <div
-        className={`mt-6 ${currentTheme.cardBackground} rounded-lg border ${currentTheme.border} p-4`}
-      >
-        <h3 className={`text-lg font-semibold ${currentTheme.textPrimary} mb-3`}>Scoring System</h3>
+      <div className="bg-card border-border mt-6 rounded-lg border p-4">
+        <h3 className="text-foreground mb-3 text-lg font-semibold">Scoring System</h3>
         <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
-          <div className="flex items-center space-x-2">
-            <div className="h-3 w-3 rounded-full bg-green-500"></div>
-            <span className={currentTheme.textSecondary}>
-              Operational Service: <span className="font-semibold text-green-400">+42 pts</span>
+          <div className="text-muted-foreground flex items-center space-x-2">
+            <div className="bg-success h-3 w-3 rounded-full" />
+            <span>
+              Operational Service: <span className="text-success font-semibold">+42 pts</span>
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-            <span className={currentTheme.textSecondary}>
-              Successful Attack: <span className="font-semibold text-blue-400">+2 pts</span>
+          <div className="text-muted-foreground flex items-center space-x-2">
+            <div className="bg-info h-3 w-3 rounded-full" />
+            <span>
+              Successful Attack: <span className="text-info font-semibold">+2 pts</span>
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="h-3 w-3 rounded-full bg-red-500"></div>
-            <span className={currentTheme.textSecondary}>
-              Compromised Service: <span className="font-semibold text-red-400">-2 pts</span>
+          <div className="text-muted-foreground flex items-center space-x-2">
+            <div className="bg-destructive h-3 w-3 rounded-full" />
+            <span>
+              Compromised Service: <span className="text-destructive font-semibold">-2 pts</span>
             </span>
           </div>
         </div>
@@ -353,61 +169,85 @@ export default function Leaderboard({ currentTheme, onDataUpdate }: LeaderboardP
 }
 
 interface LineChartProps {
-  data: ScoreHistoryEntry[];
-  currentTheme: Theme;
+  data: (TeamSeries & { color?: string })[];
 }
 
-function LineChart({ data, currentTheme }: LineChartProps) {
+/**
+ * Lazy-loads plotly.js-dist-min so the live-graph route doesn't pay the
+ * chart bundle cost. We use the pre-bundled browser build (`-dist-min`)
+ * instead of the source `plotly.js` package because Vite 8 doesn't polyfill
+ * Node built-ins like `stream`, which the source build expects.
+ */
+function LineChart({ data }: LineChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const isDark = currentTheme.textSecondary === 'text-gray-400';
+  const isDark = useIsDark();
 
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return;
+    let cancelled = false;
+    let plotlyRef: typeof import('plotly.js-dist-min') | null = null;
+    const node = chartRef.current;
 
-    const traces = data.map((team) => ({
-      x: team.values.map((v) => v.window),
-      y: team.values.map((v) => v.score),
-      type: 'scatter' as const,
-      mode: 'lines' as const,
-      name: team.teamName,
-      line: { color: team.color },
-    }));
+    (async () => {
+      const mod = await import('plotly.js-dist-min');
+      if (cancelled || !node) return;
+      plotlyRef = mod;
+      const Plotly = mod.default;
 
-    const isSmallScreen = window.innerWidth < 640;
+      const traces = data.map((team) => ({
+        x: team.values.map((v) => v.window),
+        y: team.values.map((v) => v.score),
+        type: 'scatter' as const,
+        mode: 'lines' as const,
+        name: team.teamName,
+        line: { color: team.color },
+      }));
 
-    const layout: Partial<Plotly.Layout> = {
-      paper_bgcolor: 'transparent',
-      plot_bgcolor: 'transparent',
-      font: { color: isDark ? '#ffffff' : '#111827', size: 14 },
-      title: { text: '', font: { size: 20 } },
-      xaxis: {
-        gridcolor: isDark ? '#374151' : '#d1d5db',
-        zerolinecolor: isDark ? '#4b5563' : '#9ca3af',
-        range: [0, 192],
-        dtick: 10,
-      },
-      yaxis: {
-        gridcolor: isDark ? '#374151' : '#d1d5db',
-        zerolinecolor: isDark ? '#4b5563' : '#9ca3af',
-        rangemode: 'tozero' as const,
-        dtick: 5000,
-      },
-      legend: {
-        orientation: isSmallScreen ? 'vertical' as const : 'h' as const,
-        x: isSmallScreen ? 1 : 0.5,
-        xanchor: 'center' as const,
-        y: isSmallScreen ? 0.5 : 1.1,
-      },
-      margin: { t: 20, b: 50, l: 60, r: isSmallScreen ? 100 : 20 },
-      autosize: true,
-      hovermode: isSmallScreen ? 'x unified' as const : 'closest' as const,
+      const isSmallScreen = window.innerWidth < 640;
+
+      // Resolve theme tokens at chart-time so light/dark match the design system.
+      const fg = readHslToken('--foreground') || (isDark ? '#e6edf3' : '#0b1320');
+      const grid = readHslToken('--border') || (isDark ? '#1f2a36' : '#d5dde5');
+      const zero = readHslToken('--muted-foreground') || (isDark ? '#8b96a4' : '#5a6677');
+
+      const layout: Partial<import('plotly.js-dist-min').Layout> = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: fg, size: 14 },
+        title: { text: '', font: { size: 20 } },
+        xaxis: {
+          gridcolor: grid,
+          zerolinecolor: zero,
+          range: [0, 192],
+          dtick: 10,
+        },
+        yaxis: {
+          gridcolor: grid,
+          zerolinecolor: zero,
+          rangemode: 'tozero',
+          dtick: 5000,
+        },
+        legend: {
+          orientation: isSmallScreen ? 'v' : 'h',
+          x: isSmallScreen ? 1 : 0.5,
+          xanchor: 'center',
+          y: isSmallScreen ? 0.5 : 1.1,
+        },
+        margin: { t: 20, b: 50, l: 60, r: isSmallScreen ? 100 : 20 },
+        autosize: true,
+        hovermode: isSmallScreen ? 'x unified' : 'closest',
+      };
+
+      Plotly.newPlot(node, traces, layout, {
+        responsive: true,
+        displayModeBar: false,
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (plotlyRef && node) plotlyRef.default.purge(node);
     };
-
-    Plotly.newPlot(chartRef.current, traces, layout, { 
-      responsive: true,
-      displayModeBar: false,
-      hoverinfo: isSmallScreen ? 'x+y+name' as const : 'all' as const,
-    });
   }, [data, isDark]);
 
   return <div ref={chartRef} className="h-[520px] w-full" />;
