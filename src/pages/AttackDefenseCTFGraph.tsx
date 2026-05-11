@@ -1,43 +1,16 @@
+import { readHslToken } from '@/lib/theme';
+import {
+  computeCumulativeScores,
+  type StatusData,
+  type TeamData,
+} from '@/lib/scoring';
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-interface Theme {
-  teamNameColor: string;
-  textPrimary: string;
-  textSecondary: string;
-  textTertiary: string;
-  cardBackground: string;
-  border: string;
-  svgBackground: string;
-}
-
 interface AttackDefenseCTFGraphProps {
-  theme?: string;
-  currentTheme: Theme;
   onDataUpdate: (data: Date) => void;
-}
-
-interface TeamStatus {
-  on: number;
-  teams_hit: number[];
-}
-
-interface ServiceStatus {
-  [service: string]: TeamStatus;
-}
-
-interface TimeWindowStatus {
-  [window: string]: ServiceStatus;
-}
-
-interface TeamData {
-  [teamId: string]: string;
-}
-
-interface StatusData {
-  [teamId: string]: TimeWindowStatus;
 }
 
 interface NodeData {
@@ -53,59 +26,49 @@ interface MessageData {
   color: string;
 }
 
-export default function AttackDefenseCTFGraph({
-  currentTheme,
-  onDataUpdate,
-}: AttackDefenseCTFGraphProps) {
+const WINDOWS_PER_PAGE = 10;
+
+export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTFGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
 
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const windowsPerPage = 10;
   const [windowPage, setWindowPage] = useState(0);
 
-  const [isVisible, setIsVisible] = useState(!document.hidden);
-  useEffect(() => {
-    const onVisibility = () => setIsVisible(!document.hidden);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
-
   const sampleTeamId = status !== null ? (Object.keys(status)[0] ?? null) : null;
-  const timeWindows: number[] =
-    sampleTeamId && status?.[sampleTeamId]
-      ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x))
-      : [];
+  const timeWindows: number[] = useMemo(
+    () =>
+      sampleTeamId && status?.[sampleTeamId]
+        ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x))
+        : [],
+    [sampleTeamId, status]
+  );
   const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
 
   useEffect(() => {
     if (maxTimeWindow !== null && selectedTimeWindow === null) {
       setSelectedTimeWindow(maxTimeWindow);
       setSearchParams({ window: maxTimeWindow.toString() });
-      setWindowPage(Math.floor(maxTimeWindow / windowsPerPage));
+      setWindowPage(Math.floor(maxTimeWindow / WINDOWS_PER_PAGE));
     }
   }, [maxTimeWindow, selectedTimeWindow, setSearchParams]);
 
   useEffect(() => {
     if (selectedTimeWindow !== null) {
-      setWindowPage(Math.floor(selectedTimeWindow / windowsPerPage));
+      setWindowPage(Math.floor(selectedTimeWindow / WINDOWS_PER_PAGE));
     }
   }, [selectedTimeWindow]);
 
   const activeTimeWindow = selectedTimeWindow !== null ? selectedTimeWindow : maxTimeWindow;
 
-  const totalPages = Math.ceil(timeWindows.length / windowsPerPage);
-  const pageStart = windowPage * windowsPerPage;
-  const pageEnd = pageStart + windowsPerPage;
+  const totalPages = Math.ceil(timeWindows.length / WINDOWS_PER_PAGE);
+  const pageStart = windowPage * WINDOWS_PER_PAGE;
+  const pageEnd = pageStart + WINDOWS_PER_PAGE;
   const paginatedWindows = timeWindows.slice(pageStart, pageEnd);
-
-  // console.log('Time Windows:', timeWindows);
-  // console.log(timeWindows);
-  // console.log(activeTimeWindow);
 
   useEffect(() => {
     const windowFromURL = parseInt(searchParams.get('window') || '');
@@ -130,41 +93,18 @@ export default function AttackDefenseCTFGraph({
         setStatus(data.status);
         onDataUpdate(new Date());
       })
-      .catch((err) => console.error('Failed to fetch nodes:', err));
-
-    onDataUpdate(new Date());
+      .catch((err) => console.error('Failed to fetch status:', err));
   }, [onDataUpdate]);
+
+  // Recompute cumulative scores up to the active window. Memoized so we
+  // don't re-run the O(T·W·S·N) scan on every render.
+  const scores = useMemo(
+    () => (status ? computeCumulativeScores(status, activeTimeWindow).scores : {}),
+    [status, activeTimeWindow]
+  );
 
   useEffect(() => {
     if (!teams || !status) return;
-
-    const scores: Record<string, number> = {};
-    for (const teamId in status) {
-      const teamStatus = status[teamId];
-      for (const timeWindow in teamStatus) {
-        if (!(activeTimeWindow !== null && parseInt(timeWindow) <= activeTimeWindow)) continue;
-        const lastStatus = teamStatus[timeWindow];
-        if (!scores[teamId]) {
-          scores[teamId] = 0;
-        }
-        for (const service in lastStatus) {
-          const serviceStatus = lastStatus[service];
-          if (serviceStatus.on) {
-            scores[teamId] += 42;
-          }
-          scores[teamId] += serviceStatus.teams_hit.length * 2;
-          for (const otherTeamId in status) {
-            if (
-              otherTeamId !== teamId &&
-              status[otherTeamId][timeWindow][service].teams_hit.includes(parseInt(teamId))
-            ) {
-              scores[teamId] -= 2;
-            }
-          }
-        }
-      }
-    }
-    console.log('Scores:', scores);
 
     const svgElement = svgRef.current;
     if (!svgElement) return;
@@ -191,18 +131,18 @@ export default function AttackDefenseCTFGraph({
         g.attr('transform', event.transform);
       });
 
-    (svg as any).call(zoom);
+    (svg as unknown as d3.Selection<SVGSVGElement, unknown, null, undefined>).call(zoom);
 
     const g = svg.append('g');
 
-    const cx = canvasWidth / 2,
-      cy = canvasHeight / 2;
+    const cx = canvasWidth / 2;
+    const cy = canvasHeight / 2;
     const r = Math.min(canvasWidth, canvasHeight) / 3;
     const team_ids = Object.keys(teams);
     const points = team_ids.map((id, i) => {
       const angle = (2 * Math.PI * i) / team_ids.length;
       return {
-        id: id,
+        id,
         x: cx + r * Math.cos(angle),
         y: cy + r * Math.sin(angle),
       };
@@ -213,7 +153,7 @@ export default function AttackDefenseCTFGraph({
         x: point.x,
         y: point.y,
         color: d3.interpolateRainbow(i / team_ids.length),
-        score: scores[point.id],
+        score: scores[point.id] ?? 0,
       };
     });
 
@@ -222,7 +162,6 @@ export default function AttackDefenseCTFGraph({
       activeTimeWindow !== null && firstTeamId
         ? Object.keys(status[firstTeamId][activeTimeWindow])
         : [];
-    // console.log('Services:', services);
     const serviceColors = d3.scaleOrdinal<string>().domain(services).range(d3.schemeCategory10);
 
     const messages: MessageData[] = [];
@@ -231,23 +170,22 @@ export default function AttackDefenseCTFGraph({
       for (const teamId in status) {
         const teamStatus = status[teamId];
         const lastStatus = teamStatus[activeTimeWindow];
+        if (!lastStatus) continue;
         for (const service in lastStatus) {
           const serviceStatus = lastStatus[service];
           for (const team of serviceStatus.teams_hit) {
             const team_hit_id = team.toString();
             const color = d3.color(serviceColors(service))?.formatHex() || '#000';
-            messages.push({
-              srcId: teamId,
-              dstId: team_hit_id,
-              color: color,
-            });
+            messages.push({ srcId: teamId, dstId: team_hit_id, color });
           }
         }
       }
     }
 
-    console.log('Messages:', messages);
-    console.log('Nodes:', nodes);
+    // Resolve the foreground color once for SVG labels so they follow the
+    // active Cyber Noir theme without re-running on every animation tick.
+    const labelColor = readHslToken('--foreground') || '#e6edf3';
+    const explosionColor = readHslToken('--warning') || 'orange';
 
     Object.entries(nodes).forEach(([id, node]) => {
       const { x, y, color, score } = node;
@@ -259,12 +197,32 @@ export default function AttackDefenseCTFGraph({
         .attr('x', x)
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
-        .attr('fill', currentTheme.teamNameColor)
+        .attr('fill', labelColor)
         .attr('font-size', '14px')
         .attr('font-weight', '600')
         .attr('font-family', 'system-ui, -apple-system, sans-serif')
         .text(teams[id] + ' (' + (score || 0) + ')');
     });
+
+    // Animation tuning. The previous implementation spawned every attack
+    // simultaneously every 3 s, which means a window with 200 attacks
+    // produced ~600 live SVG nodes + 200 concurrent D3 transitions. That's
+    // the source of the lag. We now:
+    //   • Cap attacks per cycle (random sample if exceeded), keeping the
+    //     visual sense of "lots happening" without the DOM melting.
+    //   • Stagger spawns evenly across the cycle so per-frame work is bounded.
+    //   • Shorten the trail-travel duration so cycles don't pile up.
+    //   • Pause the loop when the tab is hidden, *without* remounting.
+    const CYCLE_MS = 3000;
+    const ATTACK_DURATION = 1800;
+    const EXPLOSION_DURATION = 800;
+    const MAX_ATTACKS_PER_CYCLE = 80;
+
+    const cycleMessages =
+      messages.length > MAX_ATTACKS_PER_CYCLE
+        ? [...messages].sort(() => Math.random() - 0.5).slice(0, MAX_ATTACKS_PER_CYCLE)
+        : messages;
+    const stagger = cycleMessages.length > 0 ? CYCLE_MS / cycleMessages.length : 0;
 
     const sendMessage = (src: NodeData, dst: NodeData, color: string) => {
       const lineGenerator = d3.line().curve(d3.curveBasis);
@@ -279,7 +237,6 @@ export default function AttackDefenseCTFGraph({
       const pathD = lineGenerator(curvePoints);
 
       const path = g.append('path').attr('fill', 'none').attr('stroke', 'none').attr('d', pathD);
-
       const totalLength = path.node()?.getTotalLength() || 0;
 
       const trail = g
@@ -292,7 +249,7 @@ export default function AttackDefenseCTFGraph({
 
       dot
         .transition()
-        .duration(3000)
+        .duration(ATTACK_DURATION)
         .ease(d3.easeLinear)
         .tween('pathTween', () => {
           return function (t: number) {
@@ -305,16 +262,20 @@ export default function AttackDefenseCTFGraph({
           };
         })
         .on('end', () => {
-          const duration = 1000;
           const explosion = g
             .append('circle')
             .attr('cx', dst.x)
             .attr('cy', dst.y)
             .attr('r', 0)
-            .attr('fill', 'orange')
+            .attr('fill', explosionColor)
             .attr('opacity', 0.3);
 
-          explosion.transition().duration(duration).attr('r', 50).attr('opacity', 0).remove();
+          explosion
+            .transition()
+            .duration(EXPLOSION_DURATION)
+            .attr('r', 50)
+            .attr('opacity', 0)
+            .remove();
           dot.remove();
           trail.remove();
           path.remove();
@@ -325,140 +286,163 @@ export default function AttackDefenseCTFGraph({
       const initialTransform = d3.zoomIdentity
         .translate((width - canvasWidth * 0.4) / 2, (height - canvasHeight * 0.4) / 2)
         .scale(1);
-      svg.call(zoom.transform as any, initialTransform);
+      svg.call(zoom.transform as unknown as Parameters<typeof svg.call>[0], initialTransform);
     }
 
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const timeouts = new Set<ReturnType<typeof setTimeout>>();
     let stopped = false;
+    let paused = document.hidden;
 
-    function animateMessages() {
-      if (stopped) return;
-      messages.forEach((msg) => {
-        const src = nodes[msg.srcId];
-        const dst = nodes[msg.dstId];
-        sendMessage(src, dst, msg.color);
+    const onVisibility = () => {
+      paused = document.hidden;
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    function fireCycle() {
+      if (stopped || paused) return;
+      cycleMessages.forEach((msg, i) => {
+        const t = setTimeout(() => {
+          timeouts.delete(t);
+          if (stopped || paused) return;
+          const src = nodes[msg.srcId];
+          const dst = nodes[msg.dstId];
+          if (src && dst) sendMessage(src, dst, msg.color);
+        }, i * stagger);
+        timeouts.add(t);
       });
     }
 
     function loop() {
       if (stopped) return;
-      animateMessages();
-      const t = setTimeout(loop, 3000);
-      timeouts.push(t);
+      fireCycle();
+      const t = setTimeout(() => {
+        timeouts.delete(t);
+        loop();
+      }, CYCLE_MS);
+      timeouts.add(t);
     }
 
-    animateMessages();
     loop();
 
     return () => {
       stopped = true;
       timeouts.forEach(clearTimeout);
+      timeouts.clear();
+      document.removeEventListener('visibilitychange', onVisibility);
       d3.select(svgRef.current).selectAll('*').remove();
     };
-  }, [teams, status, currentTheme, isMobile, selectedTimeWindow, isVisible]);
+  }, [teams, status, scores, isMobile, activeTimeWindow]);
 
   return (
-    <>
-      <main className="container mx-auto flex-1 px-4 py-6">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className={`text-2xl font-bold ${currentTheme.textPrimary} mb-2`}>
-              Real-time Attack Visualization
-            </h2>
-            <p className={currentTheme.textSecondary}>
-              Monitor live attacks and defenses between competing teams
-            </p>
-          </div>
+    <main className="container mx-auto flex-1 px-4 py-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-foreground mb-2 text-2xl font-bold">
+            Real-time Attack Visualization
+          </h2>
+          <p className="text-muted-foreground">
+            Monitor live attacks and defenses between competing teams
+          </p>
         </div>
+      </div>
 
-        <div className="mb-4 flex items-center justify-center">
-          {timeWindows.length > 0 && (
-            <div className="flex flex-col items-center gap-2">
-              <span className={`text-sm font-medium ${currentTheme.textSecondary}`}>Window</span>
-              <div className="flex flex-wrap items-center gap-1">
-                <button
-                  onClick={() => setWindowPage((p) => Math.max(0, p - 1))}
-                  disabled={windowPage === 0}
-                  className={`h-8 w-8 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-gray-700 not-disabled:cursor-pointer disabled:opacity-50`}
-                  title="Previous windows"
-                  style={{ minWidth: '1.5rem' }}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                {paginatedWindows.map((tw) => (
+      <div className="mb-4 flex items-center justify-center">
+        {timeWindows.length > 0 && (
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-muted-foreground text-sm font-medium">Window</span>
+            <div className="flex flex-wrap items-center gap-1">
+              <button
+                onClick={() => setWindowPage((p) => Math.max(0, p - 1))}
+                disabled={windowPage === 0}
+                aria-label="Previous time-window page"
+                className="bg-card text-muted-foreground border-border hover:bg-muted flex h-8 w-8 items-center justify-center rounded border text-xs not-disabled:cursor-pointer disabled:opacity-50"
+                style={{ minWidth: '1.5rem' }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              {paginatedWindows.map((tw) => {
+                const active = tw === activeTimeWindow;
+                return (
                   <button
                     key={tw}
                     onClick={() => {
                       setSelectedTimeWindow(tw);
                       setSearchParams({ window: tw.toString() });
                     }}
-                    className={`h-8 w-8 rounded border border-gray-500 text-xs cursor-pointer ${currentTheme.cardBackground} ${currentTheme.textSecondary} ${tw === activeTimeWindow ? 'ring-2 ring-white' : ''} hover:bg-gray-700`}
+                    aria-current={active ? 'true' : undefined}
                     title={`Time Window ${tw}`}
+                    className={`h-8 w-8 cursor-pointer rounded border text-xs ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary ring-ring ring-2 ring-offset-1 ring-offset-background'
+                        : 'bg-card text-muted-foreground border-border hover:bg-muted'
+                    }`}
                   >
                     {tw}
                   </button>
-                ))}
-                <button
-                  onClick={() => setWindowPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={windowPage >= totalPages - 1}
-                  className={`h-8 w-8 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-gray-700 not-disabled:cursor-pointer disabled:opacity-50`}
-                  title="Next windows"
-                  style={{ minWidth: '1.5rem' }}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+                );
+              })}
+              <button
+                onClick={() => setWindowPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={windowPage >= totalPages - 1}
+                aria-label="Next time-window page"
+                className="bg-card text-muted-foreground border-border hover:bg-muted flex h-8 w-8 items-center justify-center rounded border text-xs not-disabled:cursor-pointer disabled:opacity-50"
+                style={{ minWidth: '1.5rem' }}
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        <div className="relative h-[calc(100vh-200px)] w-full">
+      <div className="relative h-[calc(100vh-200px)] w-full">
+        <div
+          className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
+        >
           <div
-            className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
+            className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'text-xs' : ''}`}
           >
-            <div
-              className={`${currentTheme.cardBackground} rounded-lg border p-3 shadow-lg ${currentTheme.border} ${isMobile ? 'text-xs' : ''}`}
+            <h3
+              className={`text-foreground mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}
             >
-              <h3
-                className={`${currentTheme.textPrimary} mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}
-              >
-                Scoring System
-              </h3>
-              <div className={`space-y-1 text-xs ${currentTheme.textTertiary}`}>
-                <div className="flex justify-between">
-                  <span>Operational Service:</span>
-                  <span className="text-green-400">+42 pts</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Successful Attack:</span>
-                  <span className="text-blue-400">+2 pts</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Compromised Service:</span>
-                  <span className="text-red-400">-2 pts</span>
-                </div>
+              Scoring System
+            </h3>
+            <div className="text-muted-foreground space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span>Operational Service:</span>
+                <span className="text-success font-semibold">+42 pts</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Successful Attack:</span>
+                <span className="text-info font-semibold">+2 pts</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Compromised Service:</span>
+                <span className="text-destructive font-semibold">-2 pts</span>
               </div>
             </div>
-          </div>
-
-          <div className="absolute bottom-4 left-4 z-10">
-              <div
-                className={`${currentTheme.cardBackground} rounded-lg border p-2 shadow-lg ${currentTheme.border}`}
-              >
-                <p className={`text-xs ${currentTheme.textSecondary}`}>
-                  {isMobile ? 'Pinch to zoom • Drag to pan' : 'Scroll to zoom • Drag to pan'}
-                </p>
-              </div>
-            </div>
-
-          <div className={`h-full w-full ${currentTheme.cardBackground} rounded-lg`}>
-            <svg
-              ref={svgRef}
-              className={`h-full w-full border ${currentTheme.border} rounded ${currentTheme.svgBackground} ${isMobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
-            ></svg>
           </div>
         </div>
-      </main>
-    </>
+
+        <div className="absolute bottom-4 left-4 z-10">
+          <div className="bg-card border-border rounded-lg border p-2 shadow-lg">
+            <p className="text-muted-foreground text-xs">
+              {isMobile ? 'Pinch to zoom • Drag to pan' : 'Scroll to zoom • Drag to pan'}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-card h-full w-full rounded-lg">
+          <svg
+            ref={svgRef}
+            role="img"
+            aria-label="Live attack-defense network graph"
+            className={`bg-background border-border h-full w-full rounded border ${
+              isMobile ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
+          />
+        </div>
+      </div>
+    </main>
   );
 }

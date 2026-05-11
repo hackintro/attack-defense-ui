@@ -1,39 +1,46 @@
 import rulesContent from '@/content/rules.md?raw';
+import { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 
-interface Theme {
-  cardBackground: string;
-  textPrimary: string;
-  textSecondary: string;
-  border: string;
-}
-
 interface RulesProps {
-  currentTheme: Theme;
   onDataUpdate: (data: Date) => void;
 }
 
-export default function Rules({ currentTheme, onDataUpdate }: RulesProps) {
+export default function Rules({ onDataUpdate }: RulesProps) {
+  // The Rules page is static, but Layout's nav shows the last update time —
+  // mark "now" so it doesn't read "Never" after navigating here.
+  useEffect(() => {
+    onDataUpdate(new Date());
+  }, [onDataUpdate]);
+
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
-      <div className={`prose prose-lg max-w-none ${currentTheme.textSecondary}`}>
+      <div className="text-muted-foreground prose prose-lg max-w-none">
         <ReactMarkdown
           rehypePlugins={[rehypeRaw]}
           components={{
-            h1: ({ node, ...props }) => (
-              <h1 className="mb-8 text-center text-2xl font-bold" {...props} />
+            h1: ({ ...props }) => (
+              <h1 className="text-foreground mb-8 text-center text-2xl font-bold" {...props} />
             ),
-            h2: ({ node, ...props }) => <h2 className="mt-6 mb-4 text-xl font-bold" {...props} />,
-            ul: ({ node, ...props }) => (
+            h2: ({ ...props }) => (
+              <h2 className="text-foreground mt-6 mb-4 text-xl font-bold" {...props} />
+            ),
+            ul: ({ ...props }) => (
               <ul className="list-disc space-y-2 pl-6 text-justify" {...props} />
             ),
-            code: ({ node, ...props }) => (
-              <code className="rounded bg-gray-600 px-1 py-0.5 text-sm text-white" {...props} />
+            a: ({ ...props }) => (
+              <a className="text-primary hover:underline" {...props} />
             ),
-            pre: ({ node, ...props }) => (
+            code: ({ ...props }) => (
+              <code
+                className="bg-muted text-foreground rounded px-1 py-0.5 text-sm"
+                {...props}
+              />
+            ),
+            pre: ({ ...props }) => (
               <pre
-                className={`${currentTheme.cardBackground} ${currentTheme.textPrimary} overflow-x-auto rounded border p-4 ${currentTheme.border}`}
+                className="bg-card text-foreground border-border overflow-x-auto rounded border p-4"
                 {...props}
               />
             ),
