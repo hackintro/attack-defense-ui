@@ -379,7 +379,7 @@ export default function AttackDefenseCTFGraph({
                 <button
                   onClick={() => setWindowPage((p) => Math.max(0, p - 1))}
                   disabled={windowPage === 0}
-                  className={`h-6 w-6 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-gray-100 disabled:opacity-50`}
+                  className={`h-8 w-8 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-gray-700 not-disabled:cursor-pointer disabled:opacity-50`}
                   title="Previous windows"
                   style={{ minWidth: '1.5rem' }}
                 >
@@ -392,7 +392,7 @@ export default function AttackDefenseCTFGraph({
                       setSelectedTimeWindow(tw);
                       setSearchParams({ window: tw.toString() });
                     }}
-                    className={`h-6 w-6 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} ${tw === activeTimeWindow ? 'ring-2 ring-white' : ''} hover:bg-gray-100`}
+                    className={`h-8 w-8 rounded border border-gray-500 text-xs cursor-pointer ${currentTheme.cardBackground} ${currentTheme.textSecondary} ${tw === activeTimeWindow ? 'ring-2 ring-white' : ''} hover:bg-gray-700`}
                     title={`Time Window ${tw}`}
                   >
                     {tw}
@@ -401,7 +401,7 @@ export default function AttackDefenseCTFGraph({
                 <button
                   onClick={() => setWindowPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={windowPage >= totalPages - 1}
-                  className={`h-6 w-6 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-gray-100 disabled:opacity-50`}
+                  className={`h-8 w-8 rounded border border-gray-500 text-xs ${currentTheme.cardBackground} ${currentTheme.textSecondary} flex items-center justify-center hover:bg-gray-700 not-disabled:cursor-pointer disabled:opacity-50`}
                   title="Next windows"
                   style={{ minWidth: '1.5rem' }}
                 >
@@ -441,17 +441,15 @@ export default function AttackDefenseCTFGraph({
             </div>
           </div>
 
-          {isMobile && (
-            <div className="absolute bottom-4 left-4 z-10">
+          <div className="absolute bottom-4 left-4 z-10">
               <div
                 className={`${currentTheme.cardBackground} rounded-lg border p-2 shadow-lg ${currentTheme.border}`}
               >
                 <p className={`text-xs ${currentTheme.textSecondary}`}>
-                  Pinch to zoom • Drag to pan
+                  {isMobile ? 'Pinch to zoom • Drag to pan' : 'Scroll to zoom • Drag to pan'}
                 </p>
               </div>
             </div>
-          )}
 
           <div className={`h-full w-full ${currentTheme.cardBackground} rounded-lg`}>
             <svg

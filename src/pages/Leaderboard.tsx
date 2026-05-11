@@ -8,8 +8,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import * as d3 from 'd3';
-import { useEffect, useState } from 'react';
-import { Chart } from 'react-google-charts';
+import { useEffect, useState, useRef } from 'react';
+import Plotly from 'plotly.js';
 
 interface Theme {
   cardBackground: string;
@@ -358,90 +358,57 @@ interface LineChartProps {
 }
 
 function LineChart({ data, currentTheme }: LineChartProps) {
-  const teamNames = data.map((team) => team.teamName);
-  const columns = ['Window', ...teamNames];
+  const chartRef = useRef<HTMLDivElement>(null);
+  const isDark = currentTheme.textSecondary === 'text-gray-400';
 
-  const allWindows = Array.from(new Set(data.flatMap((d) => d.values.map((v) => v.window)))).sort(
-    (a, b) => a - b
-  );
+  useEffect(() => {
+    if (!chartRef.current || data.length === 0) return;
 
-  const rows = allWindows.map((window) => {
-    const row: (number | null)[] = [window];
-    data.forEach((team) => {
-      const found = team.values.find((v) => v.window === window);
-      row.push(found ? found.score : null);
+    const traces = data.map((team) => ({
+      x: team.values.map((v) => v.window),
+      y: team.values.map((v) => v.score),
+      type: 'scatter' as const,
+      mode: 'lines' as const,
+      name: team.teamName,
+      line: { color: team.color },
+    }));
+
+    const isSmallScreen = window.innerWidth < 640;
+
+    const layout: Partial<Plotly.Layout> = {
+      paper_bgcolor: 'transparent',
+      plot_bgcolor: 'transparent',
+      font: { color: isDark ? '#ffffff' : '#111827', size: 14 },
+      title: { text: '', font: { size: 20 } },
+      xaxis: {
+        gridcolor: isDark ? '#374151' : '#d1d5db',
+        zerolinecolor: isDark ? '#4b5563' : '#9ca3af',
+        range: [0, 192],
+        dtick: 10,
+      },
+      yaxis: {
+        gridcolor: isDark ? '#374151' : '#d1d5db',
+        zerolinecolor: isDark ? '#4b5563' : '#9ca3af',
+        rangemode: 'tozero' as const,
+        dtick: 5000,
+      },
+      legend: {
+        orientation: isSmallScreen ? 'vertical' as const : 'h' as const,
+        x: isSmallScreen ? 1 : 0.5,
+        xanchor: 'center' as const,
+        y: isSmallScreen ? 0.5 : 1.1,
+      },
+      margin: { t: 20, b: 50, l: 60, r: isSmallScreen ? 100 : 20 },
+      autosize: true,
+      hovermode: isSmallScreen ? 'x unified' as const : 'closest' as const,
+    };
+
+    Plotly.newPlot(chartRef.current, traces, layout, { 
+      responsive: true,
+      displayModeBar: false,
+      hoverinfo: isSmallScreen ? 'x+y+name' as const : 'all' as const,
     });
-    return row;
-  });
+  }, [data, isDark]);
 
-  const chartData = [columns, ...rows];
-
-  const options = {
-    curveType: 'function' as const,
-    legend: {
-      position: 'top' as const,
-      alignment: 'center' as const,
-      textStyle: {
-        color: currentTheme.textPrimary === 'text-white' ? '#ffffff' : '#111827',
-        fontSize: 15,
-      },
-    },
-    chartArea: { left: 60, top: 60, width: '100%' as const, height: '70%' as const },
-    hAxis: {
-      title: 'Window',
-      gridlines: {
-        count: 20,
-        color: currentTheme.textSecondary === 'text-gray-400' ? '#374151' : '#d1d5db',
-      },
-      viewWindow: { min: 0, max: 192 },
-      ticks: Array.from({ length: 20 }, (_, i) => i * 10),
-      titleTextStyle: {
-        color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280',
-      },
-      textStyle: { color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280' },
-      baselineColor: currentTheme.textSecondary === 'text-gray-400' ? '#4b5563' : '#9ca3af',
-    },
-    vAxis: {
-      title: 'Points',
-      gridlines: {
-        count: 8,
-        color: currentTheme.textSecondary === 'text-gray-400' ? '#374151' : '#d1d5db',
-      },
-      minValue: 0,
-      ticks: (() => {
-        const maxScore = Math.max(5000, ...data.flatMap((d) => d.values.map((v) => v.score)));
-        const arr: number[] = [];
-        for (let i = 0; i <= maxScore + 1; i += 5000) arr.push(i);
-        return arr;
-      })(),
-      titleTextStyle: {
-        color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280',
-      },
-      textStyle: { color: currentTheme.textSecondary === 'text-gray-400' ? '#9ca3af' : '#6b7280' },
-      baselineColor: currentTheme.textSecondary === 'text-gray-400' ? '#4b5563' : '#9ca3af',
-    },
-    series: data.reduce((acc: Record<number, { color: string }>, team, idx) => {
-      acc[idx] = { color: team.color };
-      return acc;
-    }, {}),
-    backgroundColor: 'transparent' as const,
-    fontName: 'inherit' as const,
-    titleTextStyle: {
-      color: currentTheme.textPrimary === 'text-white' ? '#ffffff' : '#111827',
-      fontSize: 20,
-    },
-  };
-
-  return (
-    <div className="h-[520px] w-full min-w-screen">
-      <Chart
-        chartType="LineChart"
-        width="100%"
-        height="95%"
-        data={chartData}
-        options={options}
-        loader={<div>Loading Chart...</div>}
-      />
-    </div>
-  );
+  return <div ref={chartRef} className="h-[520px] w-full" />;
 }
