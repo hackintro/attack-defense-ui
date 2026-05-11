@@ -31,7 +31,7 @@ export default function App() {
             }
           />
           <Route
-            path="truth"
+            path="/truth"
             element={
               <Layout lastUpdateTime={lastUpdateTime}>
                 <Truth onDataUpdate={setLastUpdateTime} />
@@ -39,7 +39,7 @@ export default function App() {
             }
           />
           <Route
-            path="rules"
+            path="/rules"
             element={
               <Layout lastUpdateTime={lastUpdateTime}>
                 <Rules onDataUpdate={setLastUpdateTime} />
