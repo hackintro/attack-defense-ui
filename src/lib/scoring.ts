@@ -107,7 +107,7 @@ export function rankTeams(status: StatusData, teams: TeamData): TeamScoreRow[] {
       ...counters[teamId],
     }))
     .sort((a, b) => b.score - a.score)
-    .map((row, i) => ({ ...row, rank: i + 1 } as TeamScoreRow & { rank: number }));
+    .map((row, i) => ({ ...row, rank: i + 1 }) as TeamScoreRow & { rank: number });
 }
 
 /**
@@ -145,9 +145,7 @@ export function computeScoreSeries(status: StatusData, teams: TeamData): TeamSer
     }
 
     for (const teamId of teamIds) {
-      const prev = series[teamId].length
-        ? series[teamId][series[teamId].length - 1].score
-        : 0;
+      const prev = series[teamId].length ? series[teamId][series[teamId].length - 1].score : 0;
       series[teamId].push({ window: w, score: prev + delta[teamId] });
     }
   }

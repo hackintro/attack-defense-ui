@@ -29,14 +29,9 @@ export default function Rules({ onDataUpdate }: RulesProps) {
             ul: ({ ...props }) => (
               <ul className="list-disc space-y-2 pl-6 text-justify" {...props} />
             ),
-            a: ({ ...props }) => (
-              <a className="text-primary hover:underline" {...props} />
-            ),
+            a: ({ ...props }) => <a className="text-primary hover:underline" {...props} />,
             code: ({ ...props }) => (
-              <code
-                className="bg-muted text-foreground rounded px-1 py-0.5 text-sm"
-                {...props}
-              />
+              <code className="bg-muted text-foreground rounded px-1 py-0.5 text-sm" {...props} />
             ),
             pre: ({ ...props }) => (
               <pre

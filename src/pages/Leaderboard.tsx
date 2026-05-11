@@ -8,13 +8,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  computeScoreSeries,
-  rankTeams,
-  topNSeries,
   type StatusData,
   type TeamData,
   type TeamScoreRow,
   type TeamSeries,
+  computeScoreSeries,
+  rankTeams,
+  topNSeries,
 } from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
@@ -89,9 +89,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
     <main className="container mx-auto flex-1 px-4 py-6">
       <div className="mb-6">
         <h2 className="text-foreground mb-2 text-2xl font-bold">Top 10 Teams</h2>
-        <p className="text-muted-foreground">
-          Score progression over time for the leading teams
-        </p>
+        <p className="text-muted-foreground">Score progression over time for the leading teams</p>
       </div>
 
       <div className="mb-2 w-full overflow-x-auto">
@@ -133,10 +131,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <Badge
-                    variant="secondary"
-                    className="bg-info/15 text-info border-info/30 border"
-                  >
+                  <Badge variant="secondary" className="bg-info/15 text-info border-info/30 border">
                     {team.attacks}
                   </Badge>
                 </TableCell>
@@ -164,8 +159,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
           <div className="text-muted-foreground flex items-center space-x-2">
             <div className="bg-destructive h-3 w-3 rounded-full" />
             <span>
-              Compromised Service:{' '}
-              <span className="text-destructive font-semibold">-2 pts</span>
+              Compromised Service: <span className="text-destructive font-semibold">-2 pts</span>
             </span>
           </div>
         </div>

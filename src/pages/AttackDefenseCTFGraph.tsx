@@ -1,9 +1,5 @@
+import { type StatusData, type TeamData, computeCumulativeScores } from '@/lib/scoring';
 import { readHslToken } from '@/lib/theme';
-import {
-  computeCumulativeScores,
-  type StatusData,
-  type TeamData,
-} from '@/lib/scoring';
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -373,7 +369,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
                     title={`Time Window ${tw}`}
                     className={`h-8 w-8 cursor-pointer rounded border text-xs ${
                       active
-                        ? 'bg-primary text-primary-foreground border-primary ring-ring ring-2 ring-offset-1 ring-offset-background'
+                        ? 'bg-primary text-primary-foreground border-primary ring-ring ring-offset-background ring-2 ring-offset-1'
                         : 'bg-card text-muted-foreground border-border hover:bg-muted'
                     }`}
                   >
@@ -402,9 +398,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           <div
             className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'text-xs' : ''}`}
           >
-            <h3
-              className={`text-foreground mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}
-            >
+            <h3 className={`text-foreground mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}>
               Scoring System
             </h3>
             <div className="text-muted-foreground space-y-1 text-xs">
