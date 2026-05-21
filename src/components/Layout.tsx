@@ -94,7 +94,7 @@ const Navbar = ({ lastUpdateTime }: NavbarProps) => {
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <button
-                className="bg-card border-border text-foreground rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
+                className="bg-card border-border text-foreground cursor-pointer rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
                 aria-label="Open navigation menu"
               >
                 <Menu size={18} />

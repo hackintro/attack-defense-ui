@@ -4,14 +4,14 @@ Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the 
 
 ## [Rules](#rules)
 
-- **Rule #1:** We play fair. No attempts to gain root access, no DOS, no attacks on the infrastructure or our fellow students and instructors. We extract flags and submit them - we do **_NOT_** `rm -rf /` and so on. Failure to do so will result in a grade of zero, but even worse, it'll ruin the experience for everyone.
+- **Rule #1:** We play fair. No attempts to gain root access, no DOS, no attacks on the infrastructure or our fellow students and instructors. We extract flags and submit them - we do **_NOT_**  `rm -rf /` and so on. Failure to do so will result in a grade of zero, but even worse, it'll ruin the experience for everyone.
 - **Rule #2:** Make sure you follow rule #1.
 
 ## [Resources](#resources)
 
 - Every team will start with the same set of services running in a similarly configured Linux box.
 - Credentials to login to the network and your box will be committed to your repository. **DO NOT LOSE THESE** or give them to others - you are giving control of your box.
-- All competition boxes are on the same prefix (`10.219.255.X`). You can find them through `ping` / `nmap` / `etc` and `verify`. You do **_NOT_** have to send any traffic outside those IPs.
+- All competition boxes are on the same prefix (`10.219.255.X`). You can find them through `ping` / `nmap` / `etc` and `verify`. You do **_NOT_**  have to send any traffic outside those IPs.
 - Your default user is called `ctf` and can `sudo` to all other services. For a list of given capabilities checkout `/etc/sudoers`.
 
 ## [Game Mechanics and Goals](#goals)
