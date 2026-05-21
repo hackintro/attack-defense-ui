@@ -53,6 +53,6 @@ sudo -u service_user_name bash
 
 - Can't find an exploit? Move to another service, maybe this one isn't exploitable. The opposing team fixed their bug and you can no longer exploit them? Look deeper into the code, maybe more than one bugs are present.
 - Did you get compromised or accidentally lost all your service files? You can find a copy of them under /home/ctf/backup and hopefully you can still restore service.
-- Need help / have a question / wanna share ideas or provide commentary? You can follow the traditional route for such events, aka reach out to the `#attack-defense` channel on Discord. Mods should be responsive during "normal hours".
+- Need help / have a question / wanna share ideas or provide commentary? You can follow the traditional route for such events, aka reach out to the `#attack-defense-2026` channel on Discord. Mods should be responsive during "normal hours".
 
 ## [Last but not least: Have fun!!](#fun)
