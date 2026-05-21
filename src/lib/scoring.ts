@@ -6,7 +6,7 @@
  *
  * `patch_score` is a per-service, per-window multiplier in [0, 1] that scales
  * the operational reward — a fully unpatched service still earns the full 42,
- * a fully compromised one earns 0. The product is rounded to an integer so
+ * a fully replaced service earns 0. The product is rounded to an integer so
  * cumulative totals stay integral.
  *
  * The scoring math used to be duplicated in AttackDefenseCTFGraph and
