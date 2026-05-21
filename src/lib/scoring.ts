@@ -1,8 +1,13 @@
 /**
  * Scoring rules (from src/content/rules.md):
- *   +42 per service that's operational in a time window
- *    +2 per flag captured (per `teams_hit` entry by this team in a window)
- *    -2 per flag lost  (per appearance of this team's id in another team's `teams_hit`)
+ *   +round(42 * patch_score) per service that's operational in a time window
+ *    +6 per flag captured (per `teams_hit` entry by this team in a window)
+ *    -6 per flag lost  (per appearance of this team's id in another team's `teams_hit`)
+ *
+ * `patch_score` is a per-service, per-window multiplier in [0, 1] that scales
+ * the operational reward — a fully unpatched service still earns the full 42,
+ * a fully replaced service earns 0. The product is rounded to an integer so
+ * cumulative totals stay integral.
  *
  * The scoring math used to be duplicated in AttackDefenseCTFGraph and
  * Leaderboard with subtly different shapes. This module is the single source
@@ -11,13 +16,14 @@
 
 export const POINTS = {
   operational: 42,
-  attack: 2,
-  compromised: -2,
+  attack: 6,
+  compromised: -6,
 } as const;
 
 export interface ServiceTick {
   on: number;
   teams_hit: number[];
+  patch_score: number;
 }
 export type ServiceStatus = Record<string, ServiceTick>;
 export type TimeWindowStatus = Record<string, ServiceStatus>;
@@ -74,7 +80,7 @@ export function computeCumulativeScores(
       for (const service of Object.keys(tick)) {
         const s = tick[service];
         if (s.on) {
-          scores[teamId] += POINTS.operational;
+          scores[teamId] += Math.round(POINTS.operational * s.patch_score);
           counters[teamId].operational += 1;
         }
         const hits = s.teams_hit.length;
@@ -135,7 +141,7 @@ export function computeScoreSeries(status: StatusData, teams: TeamData): TeamSer
       if (!tick) continue;
       for (const service of Object.keys(tick)) {
         const s = tick[service];
-        if (s.on) delta[teamId] += POINTS.operational;
+        if (s.on) delta[teamId] += Math.round(POINTS.operational * s.patch_score);
         delta[teamId] += s.teams_hit.length * POINTS.attack;
         for (const victimId of s.teams_hit) {
           const victimKey = victimId.toString();
