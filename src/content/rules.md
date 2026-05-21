@@ -34,9 +34,9 @@ curl https://ctf.hackintro25.di.uoa.gr/submit -H "Content-Type: application/json
 
 For every service, within each time window you will receive a score based on the following criteria:<br><br>
 
-- Gaining a flag gives you 2 points.
-- Losing a flag takes away 2 points.
-- Keeping your service running with no loss of functionality gives you 42 points.<br><br>
+- Gaining a flag gives you 6 points.
+- Losing a flag takes away 6 points.
+- Keeping your service running with no loss of functionality gives you up to 42 points per window, scaled by a `patch_score` between 0 and 1 (the bigger the patch to the application the lower the score - devs appreciate small patches).<br><br>
 
 The leaderboard will reflect these metrics as the game progresses. Consider the various tradeoffs and choose wisely on what strategy you want to follow. The game is designed to be educational, so try different approaches and learn from them.
 
