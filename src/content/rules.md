@@ -11,7 +11,7 @@ Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the 
 
 - Every team will start with the same set of services running in a similarly configured Linux box.
 - Credentials to login to the network and your box will be committed to your repository. **DO NOT LOSE THESE** or give them to others - you are giving control of your box.
-- All competition boxes are on the same prefix (`10.219.255.X`). You can find them through `ping` / `nmap` / `etc` and `verify`. You do **_NOT_** have to send any traffic outside those IPs.
+- All competition boxes are on the same prefix (`10.219.255.X`). You can find them through `ping` / `nmap` / `etc` and `verify`. You do **_NOT_**  have to send any traffic outside those IPs.
 - Your default user is called `ctf` and can `sudo` to all other services. For a list of given capabilities checkout `/etc/sudoers`.
 
 ## [Game Mechanics and Goals](#goals)
@@ -55,6 +55,6 @@ sudo -u service_user_name bash
 
 - Can't find an exploit? Move to another service, maybe this one isn't exploitable. The opposing team fixed their bug and you can no longer exploit them? Look deeper into the code, maybe more than one bugs are present.
 - Did you get compromised or accidentally lost all your service files? You can find a copy of them under /home/ctf/backup and hopefully you can still restore service.
-- Need help / have a question / wanna share ideas or provide commentary? You can follow the traditional route for such events, aka reach out to the `#attack-defense` channel on Discord. Mods should be responsive during "normal hours".
+- Need help / have a question / wanna share ideas or provide commentary? You can follow the traditional route for such events, aka reach out to the `#attack-defense-2026` channel on Discord. Mods should be responsive during "normal hours".
 
 ## [Last but not least: Have fun!!](#fun)

@@ -2,7 +2,7 @@
 
 A real-time visualization dashboard for Attack-Defense Capture The Flag competitions, providing live attack monitoring, team leaderboards, and interactive network graphs.
 
-Made by ethan42 and deathwish24
+Made by ethan42, deathwish24 and TRiLON
 
 ## Features
 

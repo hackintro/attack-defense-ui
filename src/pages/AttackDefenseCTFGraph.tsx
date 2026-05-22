@@ -1,7 +1,14 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { type StatusData, type TeamData, computeCumulativeScores } from '@/lib/scoring';
-import { readHslToken } from '@/lib/theme';
+import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -22,18 +29,98 @@ interface MessageData {
   color: string;
 }
 
-const WINDOWS_PER_PAGE = 10;
+function FilterSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="bg-background text-foreground border-border flex w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-sm"
+      >
+        <span className={value ? '' : 'text-muted-foreground'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+      </button>
+      {open && (
+        <div
+          className="bg-card border-border absolute z-50 mt-1 w-full overflow-y-auto rounded border shadow-lg"
+          style={{ maxHeight: '10rem' }}
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+              className={`hover:bg-muted w-full cursor-pointer px-3 py-2 text-left text-sm ${
+                opt.value === value ? 'bg-primary/10 text-primary' : 'text-foreground'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTFGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const WINDOWS_PER_PAGE = isMobile ? 5 : 10;
 
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [windowPage, setWindowPage] = useState(0);
+  const isDark = useIsDark();
+
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterSrc, setFilterSrc] = useState('');
+  const [filterDst, setFilterDst] = useState('');
+  const [filterServices, setFilterServices] = useState<string[]>([]);
+
+  const teamIds = useMemo(() => (teams ? Object.keys(teams) : []), [teams]);
+
+  const allServices = useMemo(() => {
+    if (!status) return [];
+    const firstTeamId = Object.keys(status)[0];
+    if (!firstTeamId) return [];
+    const services = new Set<string>();
+    for (const tw in status[firstTeamId]) {
+      for (const svc in status[firstTeamId][tw]) {
+        services.add(svc);
+      }
+    }
+    return Array.from(services).sort();
+  }, [status]);
 
   const sampleTeamId = status !== null ? (Object.keys(status)[0] ?? null) : null;
   const timeWindows: number[] = useMemo(
@@ -164,13 +251,16 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
 
     if (activeTimeWindow !== null) {
       for (const teamId in status) {
+        if (filterSrc && teamId !== filterSrc) continue;
         const teamStatus = status[teamId];
         const lastStatus = teamStatus[activeTimeWindow];
         if (!lastStatus) continue;
         for (const service in lastStatus) {
+          if (filterServices.length > 0 && !filterServices.includes(service)) continue;
           const serviceStatus = lastStatus[service];
           for (const team of serviceStatus.teams_hit) {
             const team_hit_id = team.toString();
+            if (filterDst && team_hit_id !== filterDst) continue;
             const color = d3.color(serviceColors(service))?.formatHex() || '#000';
             messages.push({ srcId: teamId, dstId: team_hit_id, color });
           }
@@ -178,12 +268,23 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       }
     }
 
+    const visibleTeamIds = new Set<string>();
+    if (filterSrc || filterDst || filterServices.length > 0) {
+      if (filterSrc) visibleTeamIds.add(filterSrc);
+      if (filterDst) visibleTeamIds.add(filterDst);
+      messages.forEach((m) => {
+        visibleTeamIds.add(m.srcId);
+        visibleTeamIds.add(m.dstId);
+      });
+    }
+
     // Resolve the foreground color once for SVG labels so they follow the
     // active Cyber Noir theme without re-running on every animation tick.
-    const labelColor = readHslToken('--foreground') || '#e6edf3';
+    const labelColor = isDark ? '#e6edf3' : '#0b1320';
     const explosionColor = readHslToken('--warning') || 'orange';
 
     Object.entries(nodes).forEach(([id, node]) => {
+      if (visibleTeamIds.size > 0 && !visibleTeamIds.has(id)) return;
       const { x, y, color, score } = node;
       g.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
 
@@ -212,7 +313,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     const CYCLE_MS = 3000;
     const ATTACK_DURATION = 1800;
     const EXPLOSION_DURATION = 800;
-    const MAX_ATTACKS_PER_CYCLE = 80;
+    const MAX_ATTACKS_PER_CYCLE = 200;
 
     const cycleMessages =
       messages.length > MAX_ATTACKS_PER_CYCLE
@@ -327,7 +428,17 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       document.removeEventListener('visibilitychange', onVisibility);
       d3.select(svgRef.current).selectAll('*').remove();
     };
-  }, [teams, status, scores, isMobile, activeTimeWindow]);
+  }, [
+    teams,
+    status,
+    scores,
+    isMobile,
+    activeTimeWindow,
+    isDark,
+    filterSrc,
+    filterDst,
+    filterServices,
+  ]);
 
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
@@ -392,8 +503,83 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       </div>
 
       <div className="relative h-[calc(100vh-200px)] w-full">
+        <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 left-4'} z-10`}>
+          <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+            <DialogTrigger asChild>
+              <button
+                className="bg-card border-border hover:bg-muted flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border shadow-lg"
+                aria-label="Toggle filters"
+              >
+                <Filter size={18} className="text-foreground" />
+              </button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Filters</DialogTitle>
+              </DialogHeader>
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-foreground mb-1 block text-sm font-medium">
+                      Source Team
+                    </label>
+                    <FilterSelect
+                      value={filterSrc}
+                      onChange={setFilterSrc}
+                      options={[
+                        { value: '', label: 'All Teams' },
+                        ...teamIds.map((id) => ({ value: id, label: teams?.[id] ?? id })),
+                      ]}
+                      placeholder="All Teams"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-foreground mb-1 block text-sm font-medium">
+                      Destination Team
+                    </label>
+                    <FilterSelect
+                      value={filterDst}
+                      onChange={setFilterDst}
+                      options={[
+                        { value: '', label: 'All Teams' },
+                        ...teamIds.map((id) => ({ value: id, label: teams?.[id] ?? id })),
+                      ]}
+                      placeholder="All Teams"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-foreground mb-2 block text-sm font-medium">Services</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allServices.map((svc) => {
+                      const active = filterServices.length === 0 || filterServices.includes(svc);
+                      return (
+                        <button
+                          key={svc}
+                          onClick={() =>
+                            setFilterServices((prev) =>
+                              prev.includes(svc) ? prev.filter((s) => s !== svc) : [...prev, svc]
+                            )
+                          }
+                          className={`cursor-pointer rounded border px-3 py-2 text-center text-sm font-medium ${
+                            active
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card text-muted-foreground border-border hover:bg-muted'
+                          }`}
+                        >
+                          {svc}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
         <div
-          className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} z-10 ${isMobile ? 'w-52' : 'w-64'}`}
+          className={`absolute z-10 ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} ${isMobile ? 'w-52' : 'w-64'}`}
         >
           <div
             className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'text-xs' : ''}`}
@@ -418,7 +604,9 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           </div>
         </div>
 
-        <div className="absolute bottom-4 left-4 z-10">
+        <div
+          className={`absolute bottom-4 z-10 ${isMobile ? 'left-1/2 -translate-x-1/2' : 'left-4'}`}
+        >
           <div className="bg-card border-border rounded-lg border p-2 shadow-lg">
             <p className="text-muted-foreground text-xs">
               {isMobile ? 'Pinch to zoom • Drag to pan' : 'Scroll to zoom • Drag to pan'}

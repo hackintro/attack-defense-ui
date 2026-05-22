@@ -105,10 +105,10 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-foreground">Rank</TableHead>
-              <TableHead className="text-foreground">Team</TableHead>
-              <TableHead className="text-foreground text-right">Score</TableHead>
-              <TableHead className="text-foreground text-right">Attacks</TableHead>
+              <TableHead className="text-foreground font-bold">Rank</TableHead>
+              <TableHead className="text-foreground font-bold">Team</TableHead>
+              <TableHead className="text-foreground text-right font-bold">Score</TableHead>
+              <TableHead className="text-foreground text-right font-bold">Attacks</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -147,7 +147,8 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
           <div className="text-muted-foreground flex items-center space-x-2">
             <div className="bg-success h-3 w-3 rounded-full" />
             <span>
-              Operational Service: <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+              Operational Service:{' '}
+              <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
             </span>
           </div>
           <div className="text-muted-foreground flex items-center space-x-2">
