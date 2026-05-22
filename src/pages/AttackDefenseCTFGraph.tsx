@@ -712,7 +712,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
             <button
               onClick={() => setScoringOpen(true)}
               className={`bg-card border-border hover:bg-muted absolute top-0 ${isMobile ? 'left-0' : 'right-0'} flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border shadow-lg transition-all duration-300 ${
-                scoringOpen ? 'pointer-events-none opacity-0 scale-75' : 'opacity-100 scale-100'
+                scoringOpen ? 'pointer-events-none scale-75 opacity-0' : 'scale-100 opacity-100'
               }`}
               aria-label="Scoring system"
             >
@@ -720,12 +720,16 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
             </button>
             <div
               className={`absolute top-0 ${isMobile ? 'left-0' : 'right-0'} transition-all duration-300 ${isMobile ? 'origin-top-left' : 'origin-top-right'} ${
-                scoringOpen ? 'pointer-events-auto opacity-100 scale-100' : 'pointer-events-none opacity-0 scale-75'
+                scoringOpen
+                  ? 'pointer-events-auto scale-100 opacity-100'
+                  : 'pointer-events-none scale-75 opacity-0'
               }`}
             >
-              <div className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'w-52' : 'w-64'}`}>
+              <div
+                className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'w-52' : 'w-64'}`}
+              >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-foreground font-semibold text-sm">Scoring System</h3>
+                  <h3 className="text-foreground text-sm font-semibold">Scoring System</h3>
                   <button
                     onClick={() => setScoringOpen(false)}
                     className="bg-card border-border hover:bg-muted flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded border"
@@ -734,10 +738,12 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
                     <X size={14} className="text-foreground" />
                   </button>
                 </div>
-                <div className="text-muted-foreground space-y-1 text-xs pb-2">
+                <div className="text-muted-foreground space-y-1 pb-2 text-xs">
                   <div className="flex justify-between">
                     <span>Operational Service:</span>
-                    <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+                    <span className="text-success font-semibold">
+                      +42 pts (scaled by patch diff)
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Successful Attack:</span>
