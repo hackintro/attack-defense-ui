@@ -87,7 +87,7 @@ const Navbar = ({ lastUpdateTime }: NavbarProps) => {
             onClick={toggleTheme}
             aria-label={themeLabel}
             aria-pressed={isDark}
-            className="bg-card border-border text-foreground rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
+            className="bg-card border-border text-foreground cursor-pointer rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>

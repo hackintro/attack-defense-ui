@@ -89,13 +89,12 @@ function FilterSelect({
   );
 }
 
-const WINDOWS_PER_PAGE = 10;
-
 export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTFGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const WINDOWS_PER_PAGE = isMobile ? 5 : 10;
 
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -269,12 +268,23 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       }
     }
 
+    const visibleTeamIds = new Set<string>();
+    if (filterSrc || filterDst || filterServices.length > 0) {
+      if (filterSrc) visibleTeamIds.add(filterSrc);
+      if (filterDst) visibleTeamIds.add(filterDst);
+      messages.forEach((m) => {
+        visibleTeamIds.add(m.srcId);
+        visibleTeamIds.add(m.dstId);
+      });
+    }
+
     // Resolve the foreground color once for SVG labels so they follow the
     // active Cyber Noir theme without re-running on every animation tick.
     const labelColor = isDark ? '#e6edf3' : '#0b1320';
     const explosionColor = readHslToken('--warning') || 'orange';
 
     Object.entries(nodes).forEach(([id, node]) => {
+      if (visibleTeamIds.size > 0 && !visibleTeamIds.has(id)) return;
       const { x, y, color, score } = node;
       g.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
 
@@ -594,7 +604,9 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           </div>
         </div>
 
-        <div className="absolute bottom-4 left-4 z-10">
+        <div
+          className={`absolute bottom-4 z-10 ${isMobile ? 'left-1/2 -translate-x-1/2' : 'left-4'}`}
+        >
           <div className="bg-card border-border rounded-lg border p-2 shadow-lg">
             <p className="text-muted-foreground text-xs">
               {isMobile ? 'Pinch to zoom • Drag to pan' : 'Scroll to zoom • Drag to pan'}
