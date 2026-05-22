@@ -92,7 +92,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
         <p className="text-muted-foreground">Score progression over time for the leading teams</p>
       </div>
 
-      <div className="mb-2 w-full overflow-x-auto">
+      <div className="bg-card border-border mb-2 w-full rounded-lg border p-2 sm:p-4">
         <LineChart data={scoreHistory} />
       </div>
 
@@ -174,6 +174,19 @@ interface LineChartProps {
 }
 
 /**
+ * Pick an x-axis tick interval that yields roughly 6–12 labels regardless
+ * of how far the competition has progressed (9 windows in early game,
+ * 192 by the end).
+ */
+function pickXDtick(maxWindow: number): number {
+  if (maxWindow <= 12) return 1;
+  if (maxWindow <= 30) return 2;
+  if (maxWindow <= 60) return 5;
+  if (maxWindow <= 120) return 10;
+  return 20;
+}
+
+/**
  * Lazy-loads plotly.js-dist-min so the live-graph route doesn't pay the
  * chart bundle cost. We use the pre-bundled browser build (`-dist-min`)
  * instead of the source `plotly.js` package because Vite 8 doesn't polyfill
@@ -189,6 +202,24 @@ function LineChart({ data }: LineChartProps) {
     let plotlyRef: typeof import('plotly.js-dist-min') | null = null;
     const node = chartRef.current;
 
+    const isSmallScreen = () => window.innerWidth < 640;
+
+    // Bound the x-axis to the data, not a fixed 0..192 range — otherwise
+    // early-game data is crushed into the left ~5% of the chart. The y-axis
+    // is left to Plotly's autoscaler (with rangemode: tozero) so the old
+    // dtick=5000 stops hiding all tick labels when scores are still in the
+    // low thousands.
+    let maxWindow = 0;
+    for (const t of data) {
+      for (const v of t.values) {
+        if (v.window > maxWindow) maxWindow = v.window;
+      }
+    }
+    // Pad the right edge a bit so the latest point isn't pinned to the axis,
+    // and clamp to a minimum so a single-point chart still looks reasonable.
+    const xMax = Math.max(maxWindow + Math.max(1, Math.ceil(maxWindow * 0.05)), 8);
+    const xDtick = pickXDtick(xMax);
+
     (async () => {
       const mod = await import('plotly.js-dist-min');
       if (cancelled || !node) return;
@@ -199,57 +230,86 @@ function LineChart({ data }: LineChartProps) {
         x: team.values.map((v) => v.window),
         y: team.values.map((v) => v.score),
         type: 'scatter' as const,
-        mode: 'lines' as const,
+        mode: team.values.length <= 20 ? ('lines+markers' as const) : ('lines' as const),
         name: team.teamName,
-        line: { color: team.color },
+        line: { color: team.color, width: 2.5, shape: 'spline' as const },
+        marker: { size: 6, color: team.color },
+        hovertemplate: '<b>%{fullData.name}</b><br>Window %{x}<br>Score %{y:,}<extra></extra>',
       }));
-
-      const isSmallScreen = window.innerWidth < 640;
 
       // Resolve theme tokens at chart-time so light/dark match the design system.
       const fg = readHslToken('--foreground') || (isDark ? '#e6edf3' : '#0b1320');
+      const muted = readHslToken('--muted-foreground') || (isDark ? '#8b96a4' : '#5a6677');
       const grid = readHslToken('--border') || (isDark ? '#1f2a36' : '#d5dde5');
-      const zero = readHslToken('--muted-foreground') || (isDark ? '#8b96a4' : '#5a6677');
 
-      const layout: Partial<import('plotly.js-dist-min').Layout> = {
-        paper_bgcolor: 'transparent',
-        plot_bgcolor: 'transparent',
-        font: { color: fg, size: 14 },
-        title: { text: '', font: { size: 20 } },
-        xaxis: {
-          gridcolor: grid,
-          zerolinecolor: zero,
-          range: [0, 192],
-          dtick: 10,
-        },
-        yaxis: {
-          gridcolor: grid,
-          zerolinecolor: zero,
-          rangemode: 'tozero',
-          dtick: 5000,
-        },
-        legend: {
-          orientation: isSmallScreen ? 'v' : 'h',
-          x: isSmallScreen ? 1 : 0.5,
-          xanchor: 'center',
-          y: isSmallScreen ? 0.5 : 1.1,
-        },
-        margin: { t: 20, b: 50, l: 60, r: isSmallScreen ? 100 : 20 },
-        autosize: true,
-        hovermode: isSmallScreen ? 'x unified' : 'closest',
+      const buildLayout = (): Partial<import('plotly.js-dist-min').Layout> => {
+        const small = isSmallScreen();
+        return {
+          paper_bgcolor: 'transparent',
+          plot_bgcolor: 'transparent',
+          font: { color: fg, size: small ? 11 : 13 },
+          xaxis: {
+            title: { text: 'Time Window', font: { color: muted, size: small ? 11 : 13 } },
+            gridcolor: grid,
+            zerolinecolor: grid,
+            tickcolor: grid,
+            range: [0, xMax],
+            dtick: xDtick,
+            tickfont: { color: muted },
+          },
+          yaxis: {
+            title: { text: 'Score', font: { color: muted, size: small ? 11 : 13 } },
+            gridcolor: grid,
+            zerolinecolor: grid,
+            tickcolor: grid,
+            rangemode: 'tozero',
+            nticks: small ? 5 : 8,
+            tickformat: ',d',
+            tickfont: { color: muted },
+            automargin: true,
+          },
+          legend: {
+            orientation: 'h',
+            x: 0.5,
+            xanchor: 'center',
+            y: -0.18,
+            yanchor: 'top',
+            font: { color: fg, size: small ? 10 : 12 },
+            bgcolor: 'transparent',
+            itemwidth: 30,
+          },
+          margin: { t: 16, b: small ? 120 : 90, l: small ? 56 : 64, r: 16 },
+          autosize: true,
+          hovermode: small ? 'x unified' : 'closest',
+          hoverlabel: { bgcolor: isDark ? '#0f1620' : '#ffffff', font: { color: fg } },
+          showlegend: true,
+        };
       };
 
-      Plotly.newPlot(node, traces, layout, {
+      Plotly.newPlot(node, traces, buildLayout(), {
         responsive: true,
         displayModeBar: false,
       });
+
+      // Re-apply layout on resize so the small-screen vs. large-screen
+      // tweaks (font sizes, hovermode, margins) follow the viewport.
+      const onResize = () => {
+        if (!node) return;
+        Plotly.relayout(node, buildLayout());
+      };
+      window.addEventListener('resize', onResize);
+
+      // Stash for cleanup.
+      (node as unknown as { __onResize?: () => void }).__onResize = onResize;
     })();
 
     return () => {
       cancelled = true;
+      const handler = (node as unknown as { __onResize?: () => void }).__onResize;
+      if (handler) window.removeEventListener('resize', handler);
       if (plotlyRef && node) plotlyRef.default.purge(node);
     };
   }, [data, isDark]);
 
-  return <div ref={chartRef} className="h-[520px] w-full" />;
+  return <div ref={chartRef} className="h-[360px] w-full sm:h-[480px] lg:h-[560px]" />;
 }
