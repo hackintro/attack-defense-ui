@@ -15,7 +15,7 @@ import {
 } from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
-import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Filter, Info, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -110,6 +110,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   const isDark = useIsDark();
 
   const [filterOpen, setFilterOpen] = useState(false);
+  const [scoringOpen, setScoringOpen] = useState(false);
   const [filterSrc, setFilterSrc] = useState('');
   const [filterDst, setFilterDst] = useState('');
   const [filterServices, setFilterServices] = useState<string[]>([]);
@@ -436,7 +437,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     const CYCLE_MS = 3000;
     const ATTACK_DURATION = 1800;
     const EXPLOSION_DURATION = 800;
-    const MAX_ATTACKS_PER_CYCLE = 200;
+    const MAX_ATTACKS_PER_CYCLE = 350;
 
     const cycleMessages =
       messages.length > MAX_ATTACKS_PER_CYCLE
@@ -706,38 +707,48 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           </Dialog>
         </div>
 
-        <div
-          className={`absolute z-10 ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} ${isMobile ? 'w-52' : 'w-64'}`}
-        >
-          <div
-            className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'text-xs' : ''}`}
-          >
-            <h3 className={`text-foreground mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}>
-              Scoring System
-            </h3>
-            <div className="text-muted-foreground space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span>Operational Service:</span>
-                <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Successful Attack:</span>
-                <span className="text-info font-semibold">+6 pts</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Compromised Service:</span>
-                <span className="text-destructive font-semibold">-6 pts</span>
-              </div>
-            </div>
-            <div className="border-border text-muted-foreground mt-2 border-t pt-2 text-xs">
-              <div className={`text-foreground mb-1 font-semibold ${isMobile ? 'text-xs' : ''}`}>
-                Team HP
-              </div>
-              <div>
-                Average <span className="text-foreground">uptime × patch effectiveness</span> across
-                the team&apos;s services this window. Unpatched services count as fully functional —
-                HP only drops when uptime is bad or a deployed patch is breaking real users. Hover a
-                team for the per-service breakdown.
+        <div className={`absolute z-10 ${isMobile ? 'top-2 left-2' : 'top-4 right-4'}`}>
+          <div className="relative">
+            <button
+              onClick={() => setScoringOpen(true)}
+              className={`bg-card border-border hover:bg-muted absolute top-0 ${isMobile ? 'left-0' : 'right-0'} flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border shadow-lg transition-all duration-300 ${
+                scoringOpen ? 'pointer-events-none opacity-0 scale-75' : 'opacity-100 scale-100'
+              }`}
+              aria-label="Scoring system"
+            >
+              <Info size={18} className="text-foreground" />
+            </button>
+            <div
+              className={`absolute top-0 ${isMobile ? 'left-0' : 'right-0'} transition-all duration-300 ${isMobile ? 'origin-top-left' : 'origin-top-right'} ${
+                scoringOpen ? 'pointer-events-auto opacity-100 scale-100' : 'pointer-events-none opacity-0 scale-75'
+              }`}
+            >
+              <div className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'w-52' : 'w-64'}`}>
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <h3 className="text-foreground font-semibold text-sm">Scoring System</h3>
+                  <button
+                    onClick={() => setScoringOpen(false)}
+                    className="bg-card border-border hover:bg-muted flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded border"
+                    aria-label="Close scoring"
+                  >
+                    <X size={14} className="text-foreground" />
+                  </button>
+                </div>
+                <div className="text-muted-foreground space-y-1 text-xs pb-2">
+                  <div className="flex justify-between">
+                    <span>Operational Service:</span>
+                    <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Successful Attack:</span>
+                    <span className="text-info font-semibold">+6 pts</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Compromised Service:</span>
+                    <span className="text-destructive font-semibold">-6 pts</span>
+                  </div>
+                </div>
+                <ScoringMoreInfo />
               </div>
             </div>
           </div>
@@ -775,6 +786,40 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
         )}
       </div>
     </main>
+  );
+}
+
+function ScoringMoreInfo() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-border border-t pt-2">
+      <div
+        className={`grid transition-all duration-300 ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+      >
+        <div className="overflow-hidden">
+          <div className="text-muted-foreground pb-2 text-xs">
+            <div className="text-foreground mb-1 font-semibold">Team HP</div>
+            <div>
+              Average <span className="text-foreground">uptime × patch effectiveness</span> across
+              the team&apos;s services this window. Unpatched services count as fully functional —
+              HP only drops when uptime is bad or a deployed patch is breaking real users. Hover a
+              team for the per-service breakdown.
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center justify-center gap-1 pt-1 text-xs"
+      >
+        <ChevronDown
+          size={14}
+          className={`transition-transform duration-500 ${open ? 'rotate-180' : ''}`}
+        />
+        <span>{open ? 'Less info' : 'More info'}</span>
+      </button>
+    </div>
   );
 }
 
