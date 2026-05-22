@@ -4,7 +4,7 @@ Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the 
 
 ## [Rules](#rules)
 
-- **Rule #1:** We play fair. No attempts to gain root access, no DOS, no attacks on the infrastructure or our fellow students and instructors. We extract flags and submit them - we do **_NOT_** `rm -rf /` and so on. Failure to do so will result in a grade of zero, but even worse, it'll ruin the experience for everyone.
+- **Rule #1:** We play fair. No attempts to gain root access, no DOS, no attacks on the infrastructure or our fellow students and instructors. We extract flags and submit them - we do **_NOT_** `rm -rf /` and so on. We DO NOT take actions that prevent our classmates from getting SLA points. Failure to do so will result in a grade of zero, but even worse, it'll ruin the experience for everyone.
 - **Rule #2:** Make sure you follow rule #1.
 
 ## [Resources](#resources)
@@ -27,7 +27,7 @@ Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the 
 Your repo will contain an `api_key` that you can use to submit flags. To submit a flag, run the following:
 
 ```bash
-curl https://ctf.hackintro25.di.uoa.gr/submit -H "Content-Type: application/json" -H "Authorization: Bearer your_api_key" -d '{"flag": "flag_contents_go_here"}'
+curl https://ctf.hackintro.di.uoa.gr/submit -H "Content-Type: application/json" -H "Authorization: Bearer your_api_key" -d '{"flag": "flag_contents_go_here"}'
 ```
 
 ## [Scoring](#scoring)
