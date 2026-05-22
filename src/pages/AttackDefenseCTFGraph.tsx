@@ -14,9 +14,11 @@ import {
 } from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
-import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Filter, Info, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+
+const fadeScaleIn = { animation: 'fadeScaleIn 0.2s ease-out' };
 
 interface AttackDefenseCTFGraphProps {
   onDataUpdate: (data: Date) => void;
@@ -132,6 +134,8 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   const isDark = useIsDark();
 
   const [filterOpen, setFilterOpen] = useState(false);
+  const [scoringOpen, setScoringOpen] = useState(false);
+  const [ringOpen, setRingOpen] = useState(false);
   const [filterSrc, setFilterSrc] = useState('');
   const [filterDst, setFilterDst] = useState('');
   const [filterServices, setFilterServices] = useState<string[]>([]);
@@ -669,7 +673,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       </div>
 
       <div ref={containerRef} className="relative h-[calc(100vh-200px)] w-full">
-        <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 left-4'} z-10`}>
+        <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 left-4'} z-10`}>
           <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
             <DialogTrigger asChild>
               <button
@@ -745,66 +749,101 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
         </div>
 
         <div
-          className={`absolute z-10 ${isMobile ? 'top-2 left-2' : 'top-4 right-4'} ${isMobile ? 'w-52' : 'w-64'}`}
+          className={`absolute z-10 ${isMobile ? 'top-2 right-2' : 'top-4 right-4'}`}
         >
-          <div
-            className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'text-xs' : ''}`}
-          >
-            <h3 className={`text-foreground mb-2 font-semibold ${isMobile ? 'text-sm' : ''}`}>
-              Scoring System
-            </h3>
-            <div className="text-muted-foreground space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span>Operational Service:</span>
-                <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+          {scoringOpen ? (
+            <div
+              style={fadeScaleIn}
+              className={`bg-card border-border rounded-lg border p-3 shadow-lg ${isMobile ? 'w-52 text-xs' : 'w-64'}`}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className={`text-foreground font-semibold ${isMobile ? 'text-sm' : ''}`}>
+                  Scoring System
+                </h3>
+                <button
+                  onClick={() => setScoringOpen(false)}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1"
+                  aria-label="Close scoring panel"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <div className="flex justify-between">
-                <span>Successful Attack:</span>
-                <span className="text-info font-semibold">+6 pts</span>
+              <div className="text-muted-foreground space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span>Operational Service:</span>
+                  <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Successful Attack:</span>
+                  <span className="text-info font-semibold">+6 pts</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Compromised Service:</span>
+                  <span className="text-destructive font-semibold">-6 pts</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Compromised Service:</span>
-                <span className="text-destructive font-semibold">-6 pts</span>
-              </div>
-            </div>
-            <div className="border-border/60 mt-3 border-t pt-2">
-              <div className="text-foreground mb-1.5 text-[11px] font-semibold tracking-wide uppercase">
-                Status Ring
-              </div>
-              <div className="space-y-1.5 text-[11px]">
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-0.5">
-                    <span
-                      className="inline-block h-3 w-3 rounded-[3px]"
-                      style={{ background: healthColor(0, isDark) }}
-                    />
-                    <span
-                      className="inline-block h-3 w-3 rounded-[3px]"
-                      style={{ background: healthColor(0.5, isDark) }}
-                    />
-                    <span
-                      className="inline-block h-3 w-3 rounded-[3px]"
-                      style={{ background: healthColor(1, isDark) }}
-                    />
+              <button
+                onClick={() => setRingOpen(!ringOpen)}
+                className="border-border/60 mt-3 flex w-full cursor-pointer items-center justify-between rounded border-t pt-2 text-[11px] font-medium text-muted-foreground"
+              >
+                <span>{ringOpen ? 'Read less' : 'Read more'}</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-300 ${ringOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <div
+                className="overflow-hidden transition-all duration-300"
+                style={{ maxHeight: ringOpen ? '300px' : '0', opacity: ringOpen ? 1 : 0 }}
+              >
+                <div className="mt-2 border-border/60 border-t pt-2">
+                  <div className="text-foreground mb-1.5 text-[11px] font-semibold tracking-wide uppercase">
+                    Status Ring
                   </div>
-                  <span className="text-muted-foreground">Patch score (red = broken → green = clean)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="relative inline-block h-3 w-3 rounded-[3px] bg-slate-500/40">
-                    <span className="bg-info absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full" />
-                  </span>
-                  <span className="text-muted-foreground">Cyan dot — attacking</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="border-destructive inline-block h-3 w-3 rounded-[3px] border-2 bg-slate-500/40" />
-                  <span className="text-muted-foreground">Red ring — being hit</span>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-0.5">
+                        <span
+                          className="inline-block h-3 w-3 rounded-[3px]"
+                          style={{ background: healthColor(0, isDark) }}
+                        />
+                        <span
+                          className="inline-block h-3 w-3 rounded-[3px]"
+                          style={{ background: healthColor(0.5, isDark) }}
+                        />
+                        <span
+                          className="inline-block h-3 w-3 rounded-[3px]"
+                          style={{ background: healthColor(1, isDark) }}
+                        />
+                      </div>
+                      <span className="text-muted-foreground">Patch score (red → green)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="relative inline-block h-3 w-3 rounded-[3px] bg-slate-500/40">
+                        <span className="bg-info absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full" />
+                      </span>
+                      <span className="text-muted-foreground">Cyan dot — attacking</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="border-destructive inline-block h-3 w-3 rounded-[3px] border-2 bg-slate-500/40" />
+                      <span className="text-muted-foreground">Red ring — being hit</span>
+                    </div>
+                    <p className="text-muted-foreground/80 mt-2 italic">
+                      Hover a team for full window breakdown
+                    </p>
+                  </div>
                 </div>
               </div>
-              <p className="text-muted-foreground/80 mt-2 text-[11px] italic">
-                Hover a team for full window breakdown
-              </p>
             </div>
-          </div>
+          ) : (
+            <button
+              onClick={() => setScoringOpen(true)}
+              className="bg-card border-border hover:bg-muted flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border shadow-lg"
+              aria-label="Show scoring information"
+            >
+              <Info size={18} className="text-foreground" />
+            </button>
+          )}
         </div>
 
         <div
