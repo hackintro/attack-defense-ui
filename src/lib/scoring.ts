@@ -163,6 +163,120 @@ export function computeScoreSeries(status: StatusData, teams: TeamData): TeamSer
   }));
 }
 
+export interface ServiceWindowStats {
+  uptime: number;
+  patchScore: number;
+  attacksLaunched: number;
+  timesCompromised: number;
+  attackers: string[];
+  victims: string[];
+  operationalPoints: number;
+  attackPoints: number;
+  compromisedPoints: number;
+  subtotal: number;
+}
+
+export interface TeamWindowStats {
+  services: Record<string, ServiceWindowStats>;
+  totals: {
+    operationalPoints: number;
+    attackPoints: number;
+    compromisedPoints: number;
+    windowDelta: number;
+    attacksLaunched: number;
+    timesCompromised: number;
+    servicesUp: number;
+    servicesFullyPatched: number;
+    totalServices: number;
+  };
+}
+
+/**
+ * Per-team breakdown of what happened in a single time window: health of
+ * each service (uptime, patch_score), how many flags it captured, how many
+ * times it was hit, and how all of that decomposes into points. Powers the
+ * outer service-status ring + hover tooltip in the live graph.
+ */
+export function computeWindowStats(
+  status: StatusData,
+  window: number
+): Record<string, TeamWindowStats> {
+  const stats: Record<string, TeamWindowStats> = {};
+
+  for (const teamId of Object.keys(status)) {
+    const tick = status[teamId][window] || {};
+    const services: Record<string, ServiceWindowStats> = {};
+    for (const svc of Object.keys(tick)) {
+      const s = tick[svc];
+      const uptime = typeof s.on === 'number' ? s.on : s.on ? 1 : 0;
+      const attacksLaunched = s.teams_hit.length;
+      const operationalPoints = s.on ? Math.round(POINTS.operational * s.patch_score) : 0;
+      services[svc] = {
+        uptime,
+        patchScore: s.patch_score,
+        attacksLaunched,
+        timesCompromised: 0,
+        attackers: [],
+        victims: s.teams_hit.map(String),
+        operationalPoints,
+        attackPoints: attacksLaunched * POINTS.attack,
+        compromisedPoints: 0,
+        subtotal: 0,
+      };
+    }
+    stats[teamId] = {
+      services,
+      totals: {
+        operationalPoints: 0,
+        attackPoints: 0,
+        compromisedPoints: 0,
+        windowDelta: 0,
+        attacksLaunched: 0,
+        timesCompromised: 0,
+        servicesUp: 0,
+        servicesFullyPatched: 0,
+        totalServices: 0,
+      },
+    };
+  }
+
+  // Second pass: attribute compromises to victims.
+  for (const teamId of Object.keys(status)) {
+    const tick = status[teamId][window] || {};
+    for (const svc of Object.keys(tick)) {
+      for (const victimId of tick[svc].teams_hit) {
+        const v = victimId.toString();
+        const victim = stats[v]?.services[svc];
+        if (!victim) continue;
+        victim.timesCompromised += 1;
+        victim.attackers.push(teamId);
+      }
+    }
+  }
+
+  // Third pass: subtotals + team totals.
+  for (const teamId of Object.keys(stats)) {
+    const t = stats[teamId];
+    for (const svc of Object.keys(t.services)) {
+      const sv = t.services[svc];
+      sv.compromisedPoints = sv.timesCompromised * POINTS.compromised;
+      sv.subtotal = sv.operationalPoints + sv.attackPoints + sv.compromisedPoints;
+      t.totals.operationalPoints += sv.operationalPoints;
+      t.totals.attackPoints += sv.attackPoints;
+      t.totals.compromisedPoints += sv.compromisedPoints;
+      t.totals.attacksLaunched += sv.attacksLaunched;
+      t.totals.timesCompromised += sv.timesCompromised;
+      if (sv.uptime >= 0.5) t.totals.servicesUp += 1;
+      if (sv.patchScore >= 0.99) t.totals.servicesFullyPatched += 1;
+      t.totals.totalServices += 1;
+    }
+    t.totals.windowDelta =
+      t.totals.operationalPoints + t.totals.attackPoints + t.totals.compromisedPoints;
+  }
+
+  return stats;
+}
+
 /**
  * Top-N teams by their final cumulative score, derived from a precomputed
  * series. Avoids re-running the full scan.

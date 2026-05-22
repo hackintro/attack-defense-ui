@@ -5,7 +5,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { type StatusData, type TeamData, computeCumulativeScores } from '@/lib/scoring';
+import {
+  type StatusData,
+  type TeamData,
+  type TeamWindowStats,
+  computeCumulativeScores,
+  computeWindowStats,
+} from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
 import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
@@ -89,11 +95,34 @@ function FilterSelect({
   );
 }
 
+interface HoveredTeam {
+  teamId: string;
+  // anchor position in container-local coordinates
+  x: number;
+  y: number;
+}
+
+/**
+ * Map [0, 1] patch_score to a hue between red (0) and emerald (130).
+ * patch_score is the single dimension that drives the ring color — uptime and
+ * attack/defense activity get separate visual channels (badge / ring) so the
+ * gradient stays unambiguous.
+ */
+function healthColor(patchScore: number, isDark: boolean): string {
+  const clamped = Math.max(0, Math.min(1, patchScore));
+  const hue = clamped * 130;
+  const sat = isDark ? 78 : 68;
+  const light = isDark ? 48 : 47;
+  return `hsl(${hue} ${sat}% ${light}%)`;
+}
+
 export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTFGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [hovered, setHovered] = useState<HoveredTeam | null>(null);
   const WINDOWS_PER_PAGE = isMobile ? 5 : 10;
 
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<number | null>(null);
@@ -183,6 +212,11 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   // don't re-run the O(T·W·S·N) scan on every render.
   const scores = useMemo(
     () => (status ? computeCumulativeScores(status, activeTimeWindow).scores : {}),
+    [status, activeTimeWindow]
+  );
+
+  const windowStats = useMemo<Record<string, TeamWindowStats> | null>(
+    () => (status && activeTimeWindow != null ? computeWindowStats(status, activeTimeWindow) : null),
     [status, activeTimeWindow]
   );
 
@@ -281,16 +315,61 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     // Resolve the foreground color once for SVG labels so they follow the
     // active Cyber Noir theme without re-running on every animation tick.
     const labelColor = isDark ? '#e6edf3' : '#0b1320';
+    const tileBorderColor = isDark ? 'rgba(230,237,243,0.18)' : 'rgba(11,19,32,0.22)';
+    const matrixBgColor = isDark ? 'rgba(15,22,32,0.55)' : 'rgba(255,255,255,0.65)';
     const explosionColor = readHslToken('--warning') || 'orange';
+    const destructiveColor = readHslToken('--destructive') || '#ef4444';
+    const infoColor = readHslToken('--info') || '#22d3ee';
+
+    // Outer service-status ring. Each team gets a row of small tiles —
+    // health colored, with attack/compromise annotations — placed past
+    // the team label and rotated tangentially so they form a clean ring.
+    const matrixServices =
+      activeTimeWindow != null && firstTeamId
+        ? Object.keys(status[firstTeamId][activeTimeWindow]).sort()
+        : [];
+    const TILE_SIZE = 16;
+    const TILE_GAP = 3;
+    const MATRIX_PAD_X = 6;
+    const MATRIX_PAD_Y = 4;
+    const matrixContentWidth =
+      matrixServices.length * TILE_SIZE + Math.max(0, matrixServices.length - 1) * TILE_GAP;
+    const matrixBgWidth = matrixContentWidth + MATRIX_PAD_X * 2;
+    const matrixBgHeight = TILE_SIZE + MATRIX_PAD_Y * 2;
+    const MATRIX_RADIUS_OFFSET = 78;
+
+    const getContainerPoint = (event: MouseEvent): { x: number; y: number } => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return { x: event.clientX, y: event.clientY };
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
 
     Object.entries(nodes).forEach(([id, node]) => {
       if (visibleTeamIds.size > 0 && !visibleTeamIds.has(id)) return;
       const { x, y, color, score } = node;
-      g.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
+
+      const teamG = g
+        .append('g')
+        .attr('class', 'team-group')
+        .style('cursor', 'pointer')
+        .attr('data-team-id', id);
+
+      // Soft halo behind the team node — adds depth without competing
+      // with the live attack trails.
+      teamG
+        .append('circle')
+        .attr('cx', x)
+        .attr('cy', y)
+        .attr('r', 28)
+        .attr('fill', color)
+        .attr('opacity', 0.18);
+
+      teamG.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
 
       const labelOffset = 35;
       const labelY = y < cy ? y - labelOffset : y + labelOffset;
-      g.append('text')
+      teamG
+        .append('text')
         .attr('x', x)
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
@@ -299,6 +378,92 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
         .attr('font-weight', '600')
         .attr('font-family', 'system-ui, -apple-system, sans-serif')
         .text(teams[id] + ' (' + (score || 0) + ')');
+
+      // Service status matrix — rotated tangent to the team circle so
+      // all of them line up into one continuous outer ring.
+      if (matrixServices.length > 0 && windowStats) {
+        const angle = Math.atan2(y - cy, x - cx);
+        const mx = cx + (r + MATRIX_RADIUS_OFFSET) * Math.cos(angle);
+        const my = cy + (r + MATRIX_RADIUS_OFFSET) * Math.sin(angle);
+        const rotateDeg = (angle * 180) / Math.PI + 90;
+
+        const matrixG = teamG
+          .append('g')
+          .attr('transform', `translate(${mx}, ${my}) rotate(${rotateDeg})`);
+
+        // Backdrop pill so tiles read against the live trails behind them.
+        matrixG
+          .append('rect')
+          .attr('x', -matrixBgWidth / 2)
+          .attr('y', -matrixBgHeight / 2)
+          .attr('width', matrixBgWidth)
+          .attr('height', matrixBgHeight)
+          .attr('rx', 6)
+          .attr('fill', matrixBgColor)
+          .attr('stroke', tileBorderColor)
+          .attr('stroke-width', 1);
+
+        const stats = windowStats[id];
+        const startX = -matrixContentWidth / 2;
+
+        matrixServices.forEach((svc, i) => {
+          const sv = stats?.services[svc];
+          const patchScore = sv?.patchScore ?? 0;
+          const tx = startX + i * (TILE_SIZE + TILE_GAP);
+
+          const tile = matrixG.append('g').attr('transform', `translate(${tx}, ${-TILE_SIZE / 2})`);
+
+          // Compromised tiles get a destructive halo behind them so they
+          // pop at a glance even with the global tile fill in play.
+          if (sv && sv.timesCompromised > 0) {
+            tile
+              .append('rect')
+              .attr('x', -2)
+              .attr('y', -2)
+              .attr('width', TILE_SIZE + 4)
+              .attr('height', TILE_SIZE + 4)
+              .attr('rx', 5)
+              .attr('fill', 'none')
+              .attr('stroke', destructiveColor)
+              .attr('stroke-width', 2)
+              .attr('opacity', 0.95);
+          }
+
+          tile
+            .append('rect')
+            .attr('width', TILE_SIZE)
+            .attr('height', TILE_SIZE)
+            .attr('rx', 3)
+            .attr('fill', sv ? healthColor(patchScore, isDark) : 'transparent')
+            .attr('stroke', tileBorderColor)
+            .attr('stroke-width', 1);
+
+          // Attacker pip — small cyan dot in the top-right corner.
+          if (sv && sv.attacksLaunched > 0) {
+            tile
+              .append('circle')
+              .attr('cx', TILE_SIZE - 3.5)
+              .attr('cy', 3.5)
+              .attr('r', 2.4)
+              .attr('fill', infoColor)
+              .attr('stroke', isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.85)')
+              .attr('stroke-width', 0.8);
+          }
+        });
+      }
+
+      // Hover-to-inspect. Use mouseenter/leave so children don't re-fire
+      // the handler as the cursor moves between the node and the matrix.
+      const showTooltip = (event: MouseEvent) => {
+        const pt = getContainerPoint(event);
+        setHovered({ teamId: id, x: pt.x, y: pt.y });
+      };
+      const hideTooltip = () => setHovered(null);
+
+      teamG
+        .on('mouseenter', showTooltip as unknown as (event: Event) => void)
+        .on('mouseleave', hideTooltip)
+        .on('click', showTooltip as unknown as (event: Event) => void);
     });
 
     // Animation tuning. The previous implementation spawned every attack
@@ -432,6 +597,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     teams,
     status,
     scores,
+    windowStats,
     isMobile,
     activeTimeWindow,
     isDark,
@@ -502,7 +668,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
         )}
       </div>
 
-      <div className="relative h-[calc(100vh-200px)] w-full">
+      <div ref={containerRef} className="relative h-[calc(100vh-200px)] w-full">
         <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 left-4'} z-10`}>
           <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
             <DialogTrigger asChild>
@@ -601,6 +767,43 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
                 <span className="text-destructive font-semibold">-6 pts</span>
               </div>
             </div>
+            <div className="border-border/60 mt-3 border-t pt-2">
+              <div className="text-foreground mb-1.5 text-[11px] font-semibold tracking-wide uppercase">
+                Status Ring
+              </div>
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-0.5">
+                    <span
+                      className="inline-block h-3 w-3 rounded-[3px]"
+                      style={{ background: healthColor(0, isDark) }}
+                    />
+                    <span
+                      className="inline-block h-3 w-3 rounded-[3px]"
+                      style={{ background: healthColor(0.5, isDark) }}
+                    />
+                    <span
+                      className="inline-block h-3 w-3 rounded-[3px]"
+                      style={{ background: healthColor(1, isDark) }}
+                    />
+                  </div>
+                  <span className="text-muted-foreground">Patch score (red = broken → green = clean)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="relative inline-block h-3 w-3 rounded-[3px] bg-slate-500/40">
+                    <span className="bg-info absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full" />
+                  </span>
+                  <span className="text-muted-foreground">Cyan dot — attacking</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="border-destructive inline-block h-3 w-3 rounded-[3px] border-2 bg-slate-500/40" />
+                  <span className="text-muted-foreground">Red ring — being hit</span>
+                </div>
+              </div>
+              <p className="text-muted-foreground/80 mt-2 text-[11px] italic">
+                Hover a team for full window breakdown
+              </p>
+            </div>
           </div>
         </div>
 
@@ -619,12 +822,317 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
             ref={svgRef}
             role="img"
             aria-label="Live attack-defense network graph"
+            onClick={(e) => {
+              // Tapping empty canvas dismisses the inspector (mobile path).
+              if (!(e.target as Element).closest('.team-group')) setHovered(null);
+            }}
             className={`bg-background border-border h-full w-full rounded border ${
               isMobile ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
           />
         </div>
+
+        {hovered && teams && windowStats && (
+          <TeamInspector
+            teamName={teams[hovered.teamId] ?? hovered.teamId}
+            teamColor={d3.interpolateRainbow(
+              Math.max(0, teamIds.indexOf(hovered.teamId)) / Math.max(1, teamIds.length)
+            )}
+            stats={windowStats[hovered.teamId]}
+            totalScore={scores[hovered.teamId] ?? 0}
+            activeWindow={activeTimeWindow}
+            anchor={{ x: hovered.x, y: hovered.y }}
+            container={containerRef.current}
+            isDark={isDark}
+            onDismiss={() => setHovered(null)}
+          />
+        )}
       </div>
     </main>
+  );
+}
+
+interface TeamInspectorProps {
+  teamName: string;
+  teamColor: string;
+  stats: TeamWindowStats | undefined;
+  totalScore: number;
+  activeWindow: number | null;
+  anchor: { x: number; y: number };
+  container: HTMLDivElement | null;
+  isDark: boolean;
+  onDismiss: () => void;
+}
+
+function TeamInspector({
+  teamName,
+  teamColor,
+  stats,
+  totalScore,
+  activeWindow,
+  anchor,
+  container,
+  isDark,
+  onDismiss,
+}: TeamInspectorProps) {
+  if (!stats) return null;
+  const services = Object.entries(stats.services).sort(([a], [b]) => a.localeCompare(b));
+  const defNetTotal = stats.totals.operationalPoints + stats.totals.compromisedPoints;
+
+  // Clamp tooltip inside its container so it never bleeds off-screen.
+  const TOOLTIP_W = 440;
+  const ROW_H = 22;
+  const TOOLTIP_H = 200 + services.length * ROW_H;
+  const cw = container?.clientWidth ?? 0;
+  const ch = container?.clientHeight ?? 0;
+  let left = anchor.x + 18;
+  let top = anchor.y + 18;
+  if (cw > 0 && left + TOOLTIP_W > cw - 8) left = Math.max(8, anchor.x - TOOLTIP_W - 18);
+  if (ch > 0 && top + TOOLTIP_H > ch - 8) top = Math.max(8, ch - TOOLTIP_H - 8);
+
+  const delta = stats.totals.windowDelta;
+  const deltaColor =
+    delta > 0 ? 'text-success' : delta < 0 ? 'text-destructive' : 'text-foreground';
+
+  return (
+    <div
+      className="border-border/70 bg-card/95 absolute z-30 w-[420px] max-w-[calc(100vw-32px)] rounded-xl border p-4 text-sm shadow-2xl backdrop-blur-md"
+      style={{ left, top, pointerEvents: 'auto' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <span
+          aria-hidden
+          className="ring-background inline-block h-3.5 w-3.5 rounded-full shadow ring-2"
+          style={{ background: teamColor, boxShadow: `0 0 12px ${teamColor}` }}
+        />
+        <h4 className="text-foreground leading-none font-semibold">{teamName}</h4>
+        <span className="text-muted-foreground ml-auto text-xs">
+          Window {activeWindow ?? '—'}
+        </span>
+        <button
+          onClick={onDismiss}
+          aria-label="Close inspector"
+          className="text-muted-foreground hover:text-foreground -my-1 ml-1 cursor-pointer rounded px-1 text-xs leading-none"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="mb-3 grid grid-cols-3 gap-2 text-xs">
+        <div className="border-border/60 bg-background/40 rounded-lg border px-2 py-1.5">
+          <div className="text-muted-foreground text-[10px] tracking-wide uppercase">Total</div>
+          <div className="text-foreground text-sm font-bold tabular-nums">
+            {totalScore.toLocaleString()}
+          </div>
+        </div>
+        <div className="border-border/60 bg-background/40 rounded-lg border px-2 py-1.5">
+          <div className="text-muted-foreground text-[10px] tracking-wide uppercase">Δ window</div>
+          <div className={`text-sm font-bold tabular-nums ${deltaColor}`}>
+            {delta > 0 ? '+' : ''}
+            {delta}
+          </div>
+        </div>
+        <div className="border-border/60 bg-background/40 rounded-lg border px-2 py-1.5">
+          <div className="text-muted-foreground text-[10px] tracking-wide uppercase">Up</div>
+          <div className="text-foreground text-sm font-bold tabular-nums">
+            {stats.totals.servicesUp}/{stats.totals.totalServices}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-border/50 overflow-hidden rounded-lg border">
+        <table className="w-full text-[11px]">
+          <thead className="bg-muted/40">
+            <tr className="text-muted-foreground">
+              <th className="px-2 py-1.5 text-left font-medium">Service</th>
+              <th
+                className="px-1 py-1.5 text-right font-medium"
+                title="Defense reward (42 × patch_score) — 0 if service is down"
+              >
+                Def
+              </th>
+              <th
+                className="px-1 py-1.5 text-right font-medium"
+                title="Flags lost to other teams this window"
+              >
+                Lost
+              </th>
+              <th
+                className="px-1 py-1.5 text-right font-medium"
+                title="Defense net = Def − 6 × Lost"
+              >
+                DefΔ
+              </th>
+              <th
+                className="px-1 py-1.5 text-right font-medium"
+                title="Flags captured from other teams this window"
+              >
+                Atk
+              </th>
+              <th
+                className="px-1 py-1.5 text-right font-medium"
+                title="Attack reward = 6 × Atk"
+              >
+                AtkΔ
+              </th>
+              <th
+                className="px-2 py-1.5 text-right font-medium"
+                title="Service total = DefΔ + AtkΔ"
+              >
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {services.map(([svc, sv]) => {
+              const defNet = sv.operationalPoints + sv.compromisedPoints;
+              const atkCount = sv.attacksLaunched;
+              const atkPts = sv.attackPoints;
+              const lost = sv.timesCompromised;
+              const total = sv.subtotal;
+              return (
+                <tr key={svc} className="border-border/30 border-t">
+                  <td className="px-2 py-1">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="inline-block h-2.5 w-2.5 rounded-[2px]"
+                        style={{ background: healthColor(sv.patchScore, isDark) }}
+                        title={`patch_score = ${sv.patchScore.toFixed(2)}`}
+                      />
+                      <span className="text-foreground">{svc}</span>
+                      <span
+                        className="text-[10px] tabular-nums"
+                        style={{ color: healthColor(sv.patchScore, isDark) }}
+                        title="patch_score"
+                      >
+                        {sv.patchScore.toFixed(2)}
+                      </span>
+                      {sv.uptime < 0.5 && (
+                        <span className="text-destructive text-[9px] font-bold tracking-wider uppercase">
+                          down
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td
+                    className={`px-1 py-1 text-right tabular-nums ${
+                      sv.operationalPoints > 0 ? 'text-success' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {sv.operationalPoints > 0 ? `+${sv.operationalPoints}` : '0'}
+                  </td>
+                  <td
+                    className={`px-1 py-1 text-right tabular-nums ${
+                      lost > 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {lost}
+                  </td>
+                  <td
+                    className={`px-1 py-1 text-right tabular-nums ${
+                      defNet > 0
+                        ? 'text-success'
+                        : defNet < 0
+                          ? 'text-destructive'
+                          : 'text-foreground'
+                    }`}
+                  >
+                    {defNet > 0 ? '+' : ''}
+                    {defNet}
+                  </td>
+                  <td
+                    className={`px-1 py-1 text-right tabular-nums ${
+                      atkCount > 0 ? 'text-info font-semibold' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {atkCount}
+                  </td>
+                  <td
+                    className={`px-1 py-1 text-right tabular-nums ${
+                      atkPts > 0 ? 'text-info' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {atkPts > 0 ? `+${atkPts}` : '0'}
+                  </td>
+                  <td
+                    className={`px-2 py-1 text-right font-semibold tabular-nums ${
+                      total > 0
+                        ? 'text-success'
+                        : total < 0
+                          ? 'text-destructive'
+                          : 'text-foreground'
+                    }`}
+                  >
+                    {total > 0 ? '+' : ''}
+                    {total}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-border/60 bg-muted/40 border-t-2 font-semibold">
+              <td className="text-foreground px-2 py-1.5 text-[10px] tracking-wider uppercase">
+                Window
+              </td>
+              <td className="text-success px-1 py-1.5 text-right tabular-nums">
+                {stats.totals.operationalPoints > 0
+                  ? `+${stats.totals.operationalPoints}`
+                  : '0'}
+              </td>
+              <td
+                className={`px-1 py-1.5 text-right tabular-nums ${
+                  stats.totals.timesCompromised > 0
+                    ? 'text-destructive'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {stats.totals.timesCompromised}
+              </td>
+              <td
+                className={`px-1 py-1.5 text-right tabular-nums ${
+                  defNetTotal > 0
+                    ? 'text-success'
+                    : defNetTotal < 0
+                      ? 'text-destructive'
+                      : 'text-foreground'
+                }`}
+              >
+                {defNetTotal > 0 ? '+' : ''}
+                {defNetTotal}
+              </td>
+              <td
+                className={`px-1 py-1.5 text-right tabular-nums ${
+                  stats.totals.attacksLaunched > 0 ? 'text-info' : 'text-muted-foreground'
+                }`}
+              >
+                {stats.totals.attacksLaunched}
+              </td>
+              <td
+                className={`px-1 py-1.5 text-right tabular-nums ${
+                  stats.totals.attackPoints > 0 ? 'text-info' : 'text-muted-foreground'
+                }`}
+              >
+                {stats.totals.attackPoints > 0 ? `+${stats.totals.attackPoints}` : '0'}
+              </td>
+              <td
+                className={`px-2 py-1.5 text-right tabular-nums ${
+                  stats.totals.windowDelta > 0
+                    ? 'text-success'
+                    : stats.totals.windowDelta < 0
+                      ? 'text-destructive'
+                      : 'text-foreground'
+                }`}
+              >
+                {stats.totals.windowDelta > 0 ? '+' : ''}
+                {stats.totals.windowDelta}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
   );
 }
