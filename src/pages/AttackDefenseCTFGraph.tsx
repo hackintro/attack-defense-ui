@@ -220,7 +220,8 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   );
 
   const windowStats = useMemo<Record<string, TeamWindowStats> | null>(
-    () => (status && activeTimeWindow != null ? computeWindowStats(status, activeTimeWindow) : null),
+    () =>
+      status && activeTimeWindow != null ? computeWindowStats(status, activeTimeWindow) : null,
     [status, activeTimeWindow]
   );
 
@@ -748,9 +749,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           </Dialog>
         </div>
 
-        <div
-          className={`absolute z-10 ${isMobile ? 'top-2 right-2' : 'top-4 right-4'}`}
-        >
+        <div className={`absolute z-10 ${isMobile ? 'top-2 right-2' : 'top-4 right-4'}`}>
           {scoringOpen ? (
             <div
               style={fadeScaleIn}
@@ -784,7 +783,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
               </div>
               <button
                 onClick={() => setRingOpen(!ringOpen)}
-                className="border-border/60 mt-3 flex w-full cursor-pointer items-center justify-between rounded border-t pt-2 text-[11px] font-medium text-muted-foreground"
+                className="border-border/60 text-muted-foreground mt-3 flex w-full cursor-pointer items-center justify-between rounded border-t pt-2 text-[11px] font-medium"
               >
                 <span>{ringOpen ? 'Read less' : 'Read more'}</span>
                 <ChevronDown
@@ -796,7 +795,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
                 className="overflow-hidden transition-all duration-300"
                 style={{ maxHeight: ringOpen ? '300px' : '0', opacity: ringOpen ? 1 : 0 }}
               >
-                <div className="mt-2 border-border/60 border-t pt-2">
+                <div className="border-border/60 mt-2 border-t pt-2">
                   <div className="text-foreground mb-1.5 text-[11px] font-semibold tracking-wide uppercase">
                     Status Ring
                   </div>
@@ -946,9 +945,7 @@ function TeamInspector({
           style={{ background: teamColor, boxShadow: `0 0 12px ${teamColor}` }}
         />
         <h4 className="text-foreground leading-none font-semibold">{teamName}</h4>
-        <span className="text-muted-foreground ml-auto text-xs">
-          Window {activeWindow ?? '—'}
-        </span>
+        <span className="text-muted-foreground ml-auto text-xs">Window {activeWindow ?? '—'}</span>
         <button
           onClick={onDismiss}
           aria-label="Close inspector"
@@ -1009,10 +1006,7 @@ function TeamInspector({
               >
                 Atk
               </th>
-              <th
-                className="px-1 py-1.5 text-right font-medium"
-                title="Attack reward = 6 × Atk"
-              >
+              <th className="px-1 py-1.5 text-right font-medium" title="Attack reward = 6 × Atk">
                 AtkΔ
               </th>
               <th
@@ -1117,15 +1111,11 @@ function TeamInspector({
                 Window
               </td>
               <td className="text-success px-1 py-1.5 text-right tabular-nums">
-                {stats.totals.operationalPoints > 0
-                  ? `+${stats.totals.operationalPoints}`
-                  : '0'}
+                {stats.totals.operationalPoints > 0 ? `+${stats.totals.operationalPoints}` : '0'}
               </td>
               <td
                 className={`px-1 py-1.5 text-right tabular-nums ${
-                  stats.totals.timesCompromised > 0
-                    ? 'text-destructive'
-                    : 'text-muted-foreground'
+                  stats.totals.timesCompromised > 0 ? 'text-destructive' : 'text-muted-foreground'
                 }`}
               >
                 {stats.totals.timesCompromised}
