@@ -10,7 +10,7 @@ Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the 
 ## [Resources](#resources)
 
 - Every team will start with the same set of services running in a similarly configured Linux box.
-- Credentials to login to the network and your box will be committed to your repository. **DO NOT LOSE THESE** or give them to others - you are giving control of your box.
+- Credentials to login to the network and your box will be sent to your academic email. **DO NOT LOSE THESE** or give them to others - you are giving control of your box.
 - All competition boxes are on the same prefix (`10.219.255.X`). You can find them through `ping` / `nmap` / `etc` and `verify`. You do **_NOT_**  have to send any traffic outside those IPs.
 - Your default user is called `ctf` and can `sudo` to all other services. For a list of given capabilities checkout `/etc/sudoers`.
 
