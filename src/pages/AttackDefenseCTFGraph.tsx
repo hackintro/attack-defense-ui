@@ -328,8 +328,8 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       activeTimeWindow != null && firstTeamId
         ? Object.keys(status[firstTeamId][activeTimeWindow]).sort()
         : [];
-    const TILE_SIZE = 16;
-    const TILE_GAP = 3;
+    const TILE_SIZE = 11;
+    const TILE_GAP = 2;
     const MATRIX_PAD_X = 6;
     const MATRIX_PAD_Y = 4;
     const matrixContentWidth =
