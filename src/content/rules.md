@@ -19,7 +19,7 @@ Welcome to Hackintro's Attack Defense Capture-The-Flag (CTF) game! Here are the 
 - The event will last for a little over 48 hours, split in windows of 15 minutes.
 - During each window flags are refreshed within your boxes - one for each service. You must **_NOT_** remove these files - this is a violation of the rules.
 - **Goal #1:** ensure that your service is operational and functionally similar to the original service you were provided (modulo vulnerabilities). On every time window your service will be evaluated for functionality and whether it breaks the Service Level Agreement (SLA). Functionality checks vary across time. Failing to preserve functionality breaks the SLA and is penalized heavily (see scoring below).
-- **Goal #2:** ensure flags are not _taken_ from your services. You can do this by patching: note that you can patch vulnerabilities but all other functionality must be preserved. How can you patch? Look for options!
+- **Goal #2:** ensure flags are not _taken_ from your services. You can do this by patching: note that you can patch vulnerabilities but all other functionality must be preserved. How can you patch? Look for options! Note: these pesky developers may continue deploying new versions of the software as time progresses - make sure you have the ability to patch continuously if new versions get installed!
 - **Goal #3:** get the flags from other teams and submit them (see below how). Because flags are rotating with time windows, you can submit multiple flags for a single service as long as you can consistently exploit it across time.
 
 ## [Flag Submission](#flag-submission)
