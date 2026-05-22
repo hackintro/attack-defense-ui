@@ -5,7 +5,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { type StatusData, type TeamData, computeCumulativeScores } from '@/lib/scoring';
+import {
+  type ServiceHealthBreakdown,
+  type StatusData,
+  type TeamData,
+  type TeamHealthSnapshot,
+  computeAllTeamsHealth,
+  computeCumulativeScores,
+} from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
 import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
@@ -107,6 +114,19 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   const [filterDst, setFilterDst] = useState('');
   const [filterServices, setFilterServices] = useState<string[]>([]);
 
+  // Custom HP-area tooltip. The SVG native `<title>` flickered because
+  // animated attack dots fly through the HP region and steal hover focus.
+  // We track which team is hovered in React state and render a themed
+  // overlay tooltip outside the SVG so it stays stable regardless of what's
+  // animating underneath.
+  const [hoveredTeam, setHoveredTeam] = useState<{
+    teamId: string;
+    teamName: string;
+    services: ServiceHealthBreakdown[];
+    x: number;
+    y: number;
+  } | null>(null);
+
   const teamIds = useMemo(() => (teams ? Object.keys(teams) : []), [teams]);
 
   const allServices = useMemo(() => {
@@ -183,6 +203,15 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   // don't re-run the O(T·W·S·N) scan on every render.
   const scores = useMemo(
     () => (status ? computeCumulativeScores(status, activeTimeWindow).scores : {}),
+    [status, activeTimeWindow]
+  );
+
+  // "HP" per team for the active window (mean(uptime × patch_score) across
+  // services). Drives the per-node health bar so players can see whether
+  // their patch is actually working — high uptime alone isn't enough if
+  // patch_score dropped, that means real users are being locked out.
+  const teamHealth = useMemo<Record<string, TeamHealthSnapshot>>(
+    () => (status ? computeAllTeamsHealth(status, activeTimeWindow) : {}),
     [status, activeTimeWindow]
   );
 
@@ -278,19 +307,33 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       });
     }
 
-    // Resolve the foreground color once for SVG labels so they follow the
-    // active Cyber Noir theme without re-running on every animation tick.
+    // Resolve theme tokens once for SVG so labels and HP bars follow the
+    // active Cyber Noir palette without re-running on every animation tick.
     const labelColor = isDark ? '#e6edf3' : '#0b1320';
     const explosionColor = readHslToken('--warning') || 'orange';
+    const healthHighColor = readHslToken('--success') || '#34d399';
+    const healthMidColor = readHslToken('--warning') || '#fbbf24';
+    const healthLowColor = readHslToken('--destructive') || '#f43f5e';
+    const healthTrackColor = readHslToken('--muted') || '#1f2a36';
+
+    const HP_BAR_W = 60;
+    const HP_BAR_H = 5;
 
     Object.entries(nodes).forEach(([id, node]) => {
       if (visibleTeamIds.size > 0 && !visibleTeamIds.has(id)) return;
       const { x, y, color, score } = node;
-      g.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
+
+      // Per-node sub-group so the <title> tooltip is scoped to this team
+      // and isn't attached to the parent container.
+      const nodeG = g.append('g').attr('data-team-id', id);
+
+      nodeG.append('circle').attr('cx', x).attr('cy', y).attr('r', 20).attr('fill', color);
 
       const labelOffset = 35;
-      const labelY = y < cy ? y - labelOffset : y + labelOffset;
-      g.append('text')
+      const isAbove = y < cy;
+      const labelY = isAbove ? y - labelOffset : y + labelOffset;
+      nodeG
+        .append('text')
         .attr('x', x)
         .attr('y', labelY)
         .attr('text-anchor', 'middle')
@@ -299,7 +342,87 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
         .attr('font-weight', '600')
         .attr('font-family', 'system-ui, -apple-system, sans-serif')
         .text(teams[id] + ' (' + (score || 0) + ')');
+
+      // HP bar: aggregate (uptime × patch_score) for the active window.
+      // Sits on the far side of the label from the node so it never
+      // overlaps the team circle.
+      const snapshot = teamHealth[id];
+      if (snapshot && snapshot.services.length > 0) {
+        const barX = x - HP_BAR_W / 2;
+        const barY = isAbove ? labelY - 22 : labelY + 8;
+        const fillWidth = Math.max(0, Math.min(1, snapshot.health)) * HP_BAR_W;
+        const fillColor =
+          snapshot.health >= 0.66
+            ? healthHighColor
+            : snapshot.health >= 0.33
+              ? healthMidColor
+              : healthLowColor;
+
+        // Track
+        nodeG
+          .append('rect')
+          .attr('x', barX)
+          .attr('y', barY)
+          .attr('width', HP_BAR_W)
+          .attr('height', HP_BAR_H)
+          .attr('rx', 2)
+          .attr('fill', healthTrackColor)
+          .attr('opacity', 0.7);
+        // Fill
+        nodeG
+          .append('rect')
+          .attr('x', barX)
+          .attr('y', barY)
+          .attr('width', fillWidth)
+          .attr('height', HP_BAR_H)
+          .attr('rx', 2)
+          .attr('fill', fillColor);
+        // Percentage label
+        nodeG
+          .append('text')
+          .attr('x', x)
+          .attr('y', isAbove ? barY - 3 : barY + HP_BAR_H + 10)
+          .attr('text-anchor', 'middle')
+          .attr('fill', labelColor)
+          .attr('font-size', '10px')
+          .attr('font-weight', '500')
+          .attr('font-family', 'system-ui, -apple-system, sans-serif')
+          .text(`HP ${Math.round(snapshot.health * 100)}%`);
+
+        // Custom hover handlers — fire mouseenter/move/leave on the whole
+        // team sub-group (circle + label + HP bar + HP percentage), driving
+        // a React-rendered tooltip. The attack-animation layer below has
+        // `pointer-events: none`, so flying dots can't interrupt this hover
+        // the way they did the native SVG <title>.
+        const teamName = teams[id];
+        const services = snapshot.services;
+        nodeG
+          .style('cursor', 'help')
+          .on('mouseenter', (event: MouseEvent) => {
+            setHoveredTeam({
+              teamId: id,
+              teamName,
+              services,
+              x: event.clientX,
+              y: event.clientY,
+            });
+          })
+          .on('mousemove', (event: MouseEvent) => {
+            setHoveredTeam((prev) =>
+              prev && prev.teamId === id ? { ...prev, x: event.clientX, y: event.clientY } : prev
+            );
+          })
+          .on('mouseleave', () => {
+            setHoveredTeam((prev) => (prev && prev.teamId === id ? null : prev));
+          });
+      }
     });
+
+    // All attack animation elements live inside this sub-group so we can
+    // disable pointer-events for the entire animation layer at once.
+    // Without this, attack dots flying across HP bars steal hover focus
+    // (which is what broke the per-team tooltip before).
+    const attackLayer = g.append('g').attr('class', 'attack-layer').style('pointer-events', 'none');
 
     // Animation tuning. The previous implementation spawned every attack
     // simultaneously every 3 s, which means a window with 200 attacks
@@ -333,16 +456,20 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
       ];
       const pathD = lineGenerator(curvePoints);
 
-      const path = g.append('path').attr('fill', 'none').attr('stroke', 'none').attr('d', pathD);
+      const path = attackLayer
+        .append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'none')
+        .attr('d', pathD);
       const totalLength = path.node()?.getTotalLength() || 0;
 
-      const trail = g
+      const trail = attackLayer
         .append('path')
         .attr('fill', 'none')
         .attr('stroke', color)
         .attr('stroke-width', 2);
 
-      const dot = g.append('circle').attr('r', 6).attr('fill', color);
+      const dot = attackLayer.append('circle').attr('r', 6).attr('fill', color);
 
       dot
         .transition()
@@ -359,7 +486,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           };
         })
         .on('end', () => {
-          const explosion = g
+          const explosion = attackLayer
             .append('circle')
             .attr('cx', dst.x)
             .attr('cy', dst.y)
@@ -432,6 +559,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     teams,
     status,
     scores,
+    teamHealth,
     isMobile,
     activeTimeWindow,
     isDark,
@@ -601,6 +729,17 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
                 <span className="text-destructive font-semibold">-6 pts</span>
               </div>
             </div>
+            <div className="border-border text-muted-foreground mt-2 border-t pt-2 text-xs">
+              <div className={`text-foreground mb-1 font-semibold ${isMobile ? 'text-xs' : ''}`}>
+                Team HP
+              </div>
+              <div>
+                Average <span className="text-foreground">uptime × patch effectiveness</span> across
+                the team&apos;s services this window. Unpatched services count as fully functional —
+                HP only drops when uptime is bad or a deployed patch is breaking real users. Hover a
+                team for the per-service breakdown.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -624,7 +763,73 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
             }`}
           />
         </div>
+
+        {hoveredTeam && (
+          <TeamHealthTooltip
+            teamName={hoveredTeam.teamName}
+            services={hoveredTeam.services}
+            window={activeTimeWindow}
+            x={hoveredTeam.x}
+            y={hoveredTeam.y}
+          />
+        )}
       </div>
     </main>
+  );
+}
+
+interface TeamHealthTooltipProps {
+  teamName: string;
+  services: ServiceHealthBreakdown[];
+  window: number | null;
+  x: number;
+  y: number;
+}
+
+/**
+ * Themed hover-card for a team's per-service health. Positioned at the
+ * cursor (with viewport-edge clamping). `pointer-events: none` so the card
+ * never captures the cursor — moving across it triggers the SVG underneath
+ * to handle mouseleave naturally.
+ */
+function TeamHealthTooltip({ teamName, services, window: tw, x, y }: TeamHealthTooltipProps) {
+  const cardWidth = 280;
+  const estimatedHeight = 56 + services.length * 22;
+  const left = Math.min(Math.max(8, x + 14), window.innerWidth - cardWidth - 8);
+  const top = Math.min(Math.max(8, y + 14), window.innerHeight - estimatedHeight - 8);
+
+  return (
+    <div
+      className="pointer-events-none fixed z-50"
+      style={{ left, top, width: cardWidth }}
+      role="tooltip"
+    >
+      <div className="bg-card border-border rounded-lg border p-3 shadow-xl">
+        <div className="border-border mb-2 flex items-center justify-between border-b pb-2">
+          <span className="text-foreground text-sm font-semibold">{teamName}</span>
+          {tw !== null && <span className="text-muted-foreground text-xs">window {tw}</span>}
+        </div>
+        <ul className="space-y-1.5">
+          {services.map((s) => {
+            const dotClass =
+              s.health >= 0.66 ? 'bg-success' : s.health >= 0.33 ? 'bg-warning' : 'bg-destructive';
+            const upPct = Math.round(s.uptime * 100);
+            const servedPct = Math.round(s.patchScore * 100);
+            return (
+              <li key={s.service} className="flex items-center justify-between gap-3 text-xs">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+                  <span className="text-foreground truncate font-medium">{s.service}</span>
+                </span>
+                <span className="text-muted-foreground shrink-0 tabular-nums">
+                  {upPct}% up · {s.patched ? `patch ${servedPct}%` : 'vanilla'}
+                  {!s.on && <span className="text-destructive ml-1 font-semibold">· DOWN</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
   );
 }

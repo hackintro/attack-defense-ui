@@ -23,6 +23,17 @@ export const POINTS = {
 export interface ServiceTick {
   on: number;
   teams_hit: number[];
+  /** Fraction of probes during the window where the service was responsive (0..1). */
+  uptime: number;
+  /** Patch quality flag from the checker (0..1). */
+  patch_q: number;
+  /** Whether the binary still attests as the original service (0/1). */
+  attest: number;
+  /**
+   * Fraction of real users still served after the patch (0..1). Lower means
+   * the patch is breaking legitimate functionality — players use this to
+   * tell whether their patch is actually working.
+   */
   patch_score: number;
 }
 export type ServiceStatus = Record<string, ServiceTick>;
@@ -175,4 +186,94 @@ export function topNSeries(series: TeamSeries[], n: number): TeamSeries[] {
       return bv - av;
     })
     .slice(0, n);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Service health — exposes `uptime` and `patch_score` so players can see
+ * whether their patch is actually working. Per jarjarbinks: lower
+ * `patch_score` = more real users not being served by the patched binary.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface ServiceHealthBreakdown {
+  service: string;
+  /** 1 if the checker marked the service operational this window. */
+  on: number;
+  /** Fraction of probes that succeeded (0..1). */
+  uptime: number;
+  /** Raw `patch_score` from the API (0..1). */
+  patchScore: number;
+  /** 1 if a patch attempt was detected for this service this window. */
+  patched: 0 | 1;
+  /** Composite `uptime * effectivePatchScore` (0..1). */
+  health: number;
+}
+
+export interface TeamHealthSnapshot {
+  /** Aggregate "HP" — average of per-service health (0..1). */
+  health: number;
+  services: ServiceHealthBreakdown[];
+}
+
+const EMPTY_SNAPSHOT: TeamHealthSnapshot = { health: 0, services: [] };
+
+/**
+ * "HP" for a single team in a single window. Per service:
+ *
+ *   health = uptime * (patch_q ? patch_score : 1)
+ *
+ * The `patch_q` gate matters: the API reports `patch_score = 0` both for
+ * "I broke my patch" *and* "I haven't patched yet" — those are very
+ * different situations from a user's point of view. An unpatched (vanilla)
+ * service is still serving real users perfectly fine; it's only a *broken
+ * patch* that locks users out. The HP bar is a compass for "is my patch
+ * breaking my service" — the gameplay penalty for not patching at all is
+ * already paid in stolen flags elsewhere.
+ *
+ * Team HP is the mean of per-service health across services in the window.
+ */
+export function computeTeamHealth(
+  status: StatusData,
+  teamId: string,
+  window: number | null
+): TeamHealthSnapshot {
+  if (window === null) return EMPTY_SNAPSHOT;
+  const tick = status[teamId]?.[window];
+  if (!tick) return EMPTY_SNAPSHOT;
+
+  const services: ServiceHealthBreakdown[] = Object.keys(tick).map((name) => {
+    const s = tick[name];
+    const patched: 0 | 1 = s.patch_q > 0 ? 1 : 0;
+    const effectivePatchScore = patched ? s.patch_score : 1;
+    return {
+      service: name,
+      on: s.on,
+      uptime: s.uptime,
+      patchScore: s.patch_score,
+      patched,
+      health: s.uptime * effectivePatchScore,
+    };
+  });
+
+  const health = services.length
+    ? services.reduce((acc, s) => acc + s.health, 0) / services.length
+    : 0;
+
+  return { health, services };
+}
+
+/**
+ * Convenience: snapshot every team's health for one window. Returned as a
+ * flat record keyed by teamId so the graph effect can look up by node id
+ * without re-scanning.
+ */
+export function computeAllTeamsHealth(
+  status: StatusData,
+  window: number | null
+): Record<string, TeamHealthSnapshot> {
+  const out: Record<string, TeamHealthSnapshot> = {};
+  if (window === null) return out;
+  for (const teamId of Object.keys(status)) {
+    out[teamId] = computeTeamHealth(status, teamId, window);
+  }
+  return out;
 }
