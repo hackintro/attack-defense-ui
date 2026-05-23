@@ -526,7 +526,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     const CYCLE_MS = 3000;
     const ATTACK_DURATION = 1800;
     const EXPLOSION_DURATION = 800;
-    const MAX_ATTACKS_PER_CYCLE = 200;
+    const MAX_ATTACKS_PER_CYCLE = 2000;
 
     const cycleMessages =
       messages.length > MAX_ATTACKS_PER_CYCLE
