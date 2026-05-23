@@ -352,9 +352,11 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     const destructiveColor = readHslToken('--destructive') || '#ef4444';
     const infoColor = readHslToken('--info') || '#22d3ee';
 
-    // Outer service-status ring. Each team gets a row of small tiles —
+    // Outer service-status ring. Each team gets a small grid of tiles —
     // health colored, with attack/compromise annotations — placed past
     // the team label and rotated tangentially so they form a clean ring.
+    // Tiles wrap into rows of MATRIX_COLS so the matrix stays narrow
+    // along the circumference and doesn't collide with neighbours.
     const matrixServices =
       activeTimeWindow != null && firstTeamId
         ? Object.keys(status[firstTeamId][activeTimeWindow]).sort()
@@ -363,11 +365,18 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     const TILE_GAP = 2;
     const MATRIX_PAD_X = 6;
     const MATRIX_PAD_Y = 4;
+    const MATRIX_COLS = 3;
+    const matrixCols = Math.min(MATRIX_COLS, Math.max(1, matrixServices.length));
+    const matrixRows = Math.max(1, Math.ceil(matrixServices.length / MATRIX_COLS));
     const matrixContentWidth =
-      matrixServices.length * TILE_SIZE + Math.max(0, matrixServices.length - 1) * TILE_GAP;
+      matrixCols * TILE_SIZE + Math.max(0, matrixCols - 1) * TILE_GAP;
+    const matrixContentHeight =
+      matrixRows * TILE_SIZE + Math.max(0, matrixRows - 1) * TILE_GAP;
     const matrixBgWidth = matrixContentWidth + MATRIX_PAD_X * 2;
-    const matrixBgHeight = TILE_SIZE + MATRIX_PAD_Y * 2;
-    const MATRIX_RADIUS_OFFSET = 78;
+    const matrixBgHeight = matrixContentHeight + MATRIX_PAD_Y * 2;
+    // Keep the inner edge of the matrix at ~r+68 regardless of row count,
+    // so the team circle and label keep their clearance as the matrix grows.
+    const MATRIX_RADIUS_OFFSET = 68 + matrixBgHeight / 2;
 
     const getContainerPoint = (event: MouseEvent): { x: number; y: number } => {
       const rect = containerRef.current?.getBoundingClientRect();
@@ -435,14 +444,22 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           .attr('stroke-width', 1);
 
         const stats = windowStats[id];
-        const startX = -matrixContentWidth / 2;
+        const startY = -matrixContentHeight / 2;
 
         matrixServices.forEach((svc, i) => {
           const sv = stats?.services[svc];
           const patchScore = sv?.patchScore ?? 0;
-          const tx = startX + i * (TILE_SIZE + TILE_GAP);
+          const row = Math.floor(i / MATRIX_COLS);
+          const col = i % MATRIX_COLS;
+          // Tiles in the final (possibly short) row are centered so the
+          // matrix stays visually balanced when service count % cols ≠ 0.
+          const itemsInRow = Math.min(MATRIX_COLS, matrixServices.length - row * MATRIX_COLS);
+          const rowWidth = itemsInRow * TILE_SIZE + Math.max(0, itemsInRow - 1) * TILE_GAP;
+          const rowStartX = -rowWidth / 2;
+          const tx = rowStartX + col * (TILE_SIZE + TILE_GAP);
+          const ty = startY + row * (TILE_SIZE + TILE_GAP);
 
-          const tile = matrixG.append('g').attr('transform', `translate(${tx}, ${-TILE_SIZE / 2})`);
+          const tile = matrixG.append('g').attr('transform', `translate(${tx}, ${ty})`);
 
           // Compromised tiles get a destructive halo behind them so they
           // pop at a glance even with the global tile fill in play.
