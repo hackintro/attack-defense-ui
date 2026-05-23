@@ -368,10 +368,8 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     const MATRIX_COLS = 3;
     const matrixCols = Math.min(MATRIX_COLS, Math.max(1, matrixServices.length));
     const matrixRows = Math.max(1, Math.ceil(matrixServices.length / MATRIX_COLS));
-    const matrixContentWidth =
-      matrixCols * TILE_SIZE + Math.max(0, matrixCols - 1) * TILE_GAP;
-    const matrixContentHeight =
-      matrixRows * TILE_SIZE + Math.max(0, matrixRows - 1) * TILE_GAP;
+    const matrixContentWidth = matrixCols * TILE_SIZE + Math.max(0, matrixCols - 1) * TILE_GAP;
+    const matrixContentHeight = matrixRows * TILE_SIZE + Math.max(0, matrixRows - 1) * TILE_GAP;
     const matrixBgWidth = matrixContentWidth + MATRIX_PAD_X * 2;
     const matrixBgHeight = matrixContentHeight + MATRIX_PAD_Y * 2;
     // Keep the inner edge of the matrix at ~r+68 regardless of row count,

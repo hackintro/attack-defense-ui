@@ -169,8 +169,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
           <div className="text-muted-foreground flex items-center space-x-2">
             <div className="bg-success h-3 w-3 rounded-full" />
             <span>
-              Operational Service:{' '}
-              <span className="text-success font-semibold">Up to +42 pts</span>
+              Operational Service: <span className="text-success font-semibold">Up to +42 pts</span>
             </span>
           </div>
           <div className="text-muted-foreground flex items-center space-x-2">
@@ -227,9 +226,7 @@ function ChartViewToggle({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={`relative z-10 cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors ${
-              active
-                ? 'text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+              active ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {opt.label}
