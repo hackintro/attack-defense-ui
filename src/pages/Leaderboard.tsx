@@ -8,12 +8,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  type StatusData,
+  type ScorePayload,
+  type StatsBlock,
   type TeamData,
   type TeamScoreRow,
   type TeamSeries,
-  computeScoreSeries,
-  rankTeams,
+  rankFromStats,
+  seriesFromAggregate,
   topNSeries,
 } from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
@@ -24,9 +25,7 @@ interface LeaderboardProps {
   onDataUpdate: (data: Date) => void;
 }
 
-interface RankedTeam extends TeamScoreRow {
-  rank: number;
-}
+type RankedTeam = TeamScoreRow;
 
 /**
  * Medal styling for ranks 1-3. Gold / silver / bronze with a soft outer
@@ -48,36 +47,36 @@ function rankMedalClasses(rank: number): string {
 
 export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
   const [teams, setTeams] = useState<TeamData | null>(null);
-  const [status, setStatus] = useState<StatusData | null>(null);
+  const [stats, setStats] = useState<StatsBlock | null>(null);
 
   useEffect(() => {
-    fetch('/status')
+    fetch('/status/latest.json')
       .then((response) => response.json())
-      .then((data) => {
+      .then((data: ScorePayload) => {
         setTeams(data.teams);
-        setStatus(data.status);
+        setStats(data.stats);
         onDataUpdate(new Date());
       })
       .catch((error) => console.error('Error fetching status:', error));
   }, [onDataUpdate]);
 
   const leaderboardData = useMemo<RankedTeam[]>(
-    () => (teams && status ? (rankTeams(status, teams) as RankedTeam[]) : []),
-    [teams, status]
+    () => (teams && stats ? rankFromStats(teams, stats) : []),
+    [teams, stats]
   );
 
   const scoreHistory = useMemo<TeamSeries[]>(() => {
-    if (!teams || !status) return [];
-    const series = computeScoreSeries(status, teams);
+    if (!teams || !stats) return [];
+    const series = seriesFromAggregate(teams, stats);
     const top = topNSeries(series, 10);
     return top.map((s, i) => ({
       ...s,
       // attach a stable D3 categorical color for the chart legend
       color: d3.schemeCategory10[i % 10],
     })) as TeamSeries[];
-  }, [teams, status]);
+  }, [teams, stats]);
 
-  if (!teams || !status) {
+  if (!teams || !stats) {
     return (
       <main className="container mx-auto flex-1 px-4 py-6">
         <div className="text-muted-foreground text-center">Loading leaderboard...</div>

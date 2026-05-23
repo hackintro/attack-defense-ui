@@ -9,9 +9,19 @@
  * a fully replaced service earns 0. The product is rounded to an integer so
  * cumulative totals stay integral.
  *
- * The scoring math used to be duplicated in AttackDefenseCTFGraph and
- * Leaderboard with subtly different shapes. This module is the single source
- * of truth — both pages call into it.
+ * The backend exposes the data through two endpoints:
+ *   /status/latest.json          — the most recent window + global stats block
+ *   /status/score{N+1:03d}.json  — a specific window (URL counts from 1)
+ *
+ * Both payloads share the same shape (see `ScorePayload`):
+ *   • `status` is keyed by team → window → service, but only contains a
+ *     single window's data — enough to drive the live attack ring and the
+ *     per-window inspector tooltip.
+ *   • `stats.aggregate[teamId][windowKey]` is the team's *per-window score
+ *     delta* — the points earned (or lost) in that single window, computed
+ *     server-side. Every cumulative display the UI shows (leaderboard,
+ *     line chart, graph labels) sums these deltas across windows ≤ N
+ *     rather than re-walking the full attack data.
  */
 
 export const POINTS = {
@@ -24,22 +34,40 @@ export interface ServiceTick {
   on: number;
   teams_hit: number[];
   patch_score: number;
+  uptime: number;
+  patch_q: number;
+  attest: number;
 }
 export type ServiceStatus = Record<string, ServiceTick>;
 export type TimeWindowStatus = Record<string, ServiceStatus>;
 export type StatusData = Record<string, TimeWindowStatus>;
 export type TeamData = Record<string, string>;
 
-export interface TeamCounters {
-  operational: number;
-  attacks: number;
-  compromised: number;
+/**
+ * The `stats` block in every /status/*.json payload. `aggregate` is a
+ * sparse-looking map (`window` is stringified) but in practice every team
+ * has an entry for every window from 0 up to `stats.window`.
+ */
+export interface StatsBlock {
+  window: number;
+  aggregate: Record<string, Record<string, number>>;
+  flags_lost: Record<string, number>;
+  flags_won: Record<string, number>;
 }
 
-export interface TeamScoreRow extends TeamCounters {
+export interface ScorePayload {
+  teams: TeamData;
+  status: StatusData;
+  stats: StatsBlock;
+}
+
+export interface TeamScoreRow {
   teamId: string;
   teamName: string;
   score: number;
+  attacks: number;
+  flagsLost: number;
+  rank: number;
 }
 
 export interface ScorePoint {
@@ -54,113 +82,87 @@ export interface TeamSeries {
 }
 
 /**
- * Cumulative score per team across every time window in `status`, optionally
- * truncated to windows `<= upToWindow`. Also returns per-team operational /
- * attack / compromised counters in one pass — both pages need them.
+ * Build the URL path for a specific window. The backend names files with a
+ * 1-based, 3-digit index, so window 0 → `score001.json`, window 48 →
+ * `score049.json`. Caller is expected to prefix `/status/`.
  */
-export function computeCumulativeScores(
-  status: StatusData,
-  upToWindow?: number | null
-): { scores: Record<string, number>; counters: Record<string, TeamCounters> } {
-  const scores: Record<string, number> = {};
-  const counters: Record<string, TeamCounters> = {};
-
-  for (const teamId of Object.keys(status)) {
-    scores[teamId] = 0;
-    counters[teamId] = { operational: 0, attacks: 0, compromised: 0 };
-  }
-
-  for (const teamId of Object.keys(status)) {
-    const teamWindows = status[teamId];
-    for (const windowStr of Object.keys(teamWindows)) {
-      const w = parseInt(windowStr, 10);
-      if (upToWindow != null && w > upToWindow) continue;
-
-      const tick = teamWindows[windowStr];
-      for (const service of Object.keys(tick)) {
-        const s = tick[service];
-        if (s.on) {
-          scores[teamId] += Math.round(POINTS.operational * s.patch_score);
-          counters[teamId].operational += 1;
-        }
-        const hits = s.teams_hit.length;
-        scores[teamId] += hits * POINTS.attack;
-        counters[teamId].attacks += hits;
-
-        for (const victimId of s.teams_hit) {
-          const victimKey = victimId.toString();
-          if (scores[victimKey] === undefined) continue;
-          scores[victimKey] += POINTS.compromised;
-          counters[victimKey].compromised += 1;
-        }
-      }
-    }
-  }
-
-  return { scores, counters };
+export function scoreFileName(window: number): string {
+  return `score${String(window + 1).padStart(3, '0')}.json`;
 }
 
 /**
- * Sort teams by cumulative score (desc) and tag each with a 1-based rank.
+ * Sorted list of every time window present in `stats.aggregate`. Different
+ * teams may have started scoring at different windows, so we union the keys
+ * across teams rather than trusting any single one.
  */
-export function rankTeams(status: StatusData, teams: TeamData): TeamScoreRow[] {
-  const { scores, counters } = computeCumulativeScores(status);
-  return Object.entries(scores)
-    .map(([teamId, score]) => ({
+export function availableWindows(stats: StatsBlock): number[] {
+  const all = new Set<number>();
+  for (const teamId of Object.keys(stats.aggregate)) {
+    for (const w of Object.keys(stats.aggregate[teamId])) {
+      all.add(parseInt(w, 10));
+    }
+  }
+  return Array.from(all).sort((a, b) => a - b);
+}
+
+/**
+ * Cumulative score per team at the end of `window` — i.e. the sum of every
+ * `stats.aggregate[teamId][w]` delta for `w <= window`. This is what the
+ * graph node labels and the leaderboard rank by.
+ */
+export function scoresAtWindow(stats: StatsBlock, window: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const teamId of Object.keys(stats.aggregate)) {
+    const teamMap = stats.aggregate[teamId];
+    let sum = 0;
+    for (const wStr of Object.keys(teamMap)) {
+      const w = parseInt(wStr, 10);
+      if (w <= window) sum += teamMap[wStr];
+    }
+    out[teamId] = sum;
+  }
+  return out;
+}
+
+/**
+ * Leaderboard rows derived from the pre-computed stats block. Score and
+ * attack/loss tallies come straight from the server — no scan required.
+ */
+export function rankFromStats(teams: TeamData, stats: StatsBlock): TeamScoreRow[] {
+  const scores = scoresAtWindow(stats, stats.window);
+  return Object.keys(scores)
+    .map((teamId) => ({
       teamId,
       teamName: teams[teamId] ?? teamId,
-      score,
-      ...counters[teamId],
+      score: scores[teamId],
+      attacks: stats.flags_won[teamId] ?? 0,
+      flagsLost: stats.flags_lost[teamId] ?? 0,
     }))
     .sort((a, b) => b.score - a.score)
-    .map((row, i) => ({ ...row, rank: i + 1 }) as TeamScoreRow & { rank: number });
+    .map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
 /**
- * Per-team cumulative-score series, one point per time window present in
- * `status`. Windows are returned in ascending order.
+ * Per-team cumulative-score series — one point per window in
+ * `stats.aggregate`, with `score` being the running sum of per-window
+ * deltas through that window. Ascending window order; matches the shape
+ * the line chart in Leaderboard.tsx expects.
  */
-export function computeScoreSeries(status: StatusData, teams: TeamData): TeamSeries[] {
-  const allWindows = new Set<number>();
-  for (const teamId of Object.keys(status)) {
-    for (const w of Object.keys(status[teamId])) allWindows.add(parseInt(w, 10));
-  }
-  const sortedWindows = Array.from(allWindows).sort((a, b) => a - b);
-
-  const teamIds = Object.keys(status);
-  const series: Record<string, ScorePoint[]> = {};
-  for (const teamId of teamIds) series[teamId] = [];
-
-  for (const w of sortedWindows) {
-    // Delta for window w only.
-    const delta: Record<string, number> = {};
-    for (const teamId of teamIds) delta[teamId] = 0;
-
-    for (const teamId of teamIds) {
-      const tick = status[teamId][w];
-      if (!tick) continue;
-      for (const service of Object.keys(tick)) {
-        const s = tick[service];
-        if (s.on) delta[teamId] += Math.round(POINTS.operational * s.patch_score);
-        delta[teamId] += s.teams_hit.length * POINTS.attack;
-        for (const victimId of s.teams_hit) {
-          const victimKey = victimId.toString();
-          if (delta[victimKey] !== undefined) delta[victimKey] += POINTS.compromised;
-        }
-      }
-    }
-
-    for (const teamId of teamIds) {
-      const prev = series[teamId].length ? series[teamId][series[teamId].length - 1].score : 0;
-      series[teamId].push({ window: w, score: prev + delta[teamId] });
-    }
-  }
-
-  return teamIds.map((teamId) => ({
-    teamId,
-    teamName: teams[teamId] ?? teamId,
-    values: series[teamId],
-  }));
+export function seriesFromAggregate(teams: TeamData, stats: StatsBlock): TeamSeries[] {
+  const windows = availableWindows(stats);
+  return Object.keys(stats.aggregate).map((teamId) => {
+    const teamMap = stats.aggregate[teamId];
+    let cum = 0;
+    const values: ScorePoint[] = windows.map((w) => {
+      cum += teamMap[w.toString()] ?? 0;
+      return { window: w, score: cum };
+    });
+    return {
+      teamId,
+      teamName: teams[teamId] ?? teamId,
+      values,
+    };
+  });
 }
 
 export interface ServiceWindowStats {
@@ -196,6 +198,9 @@ export interface TeamWindowStats {
  * each service (uptime, patch_score), how many flags it captured, how many
  * times it was hit, and how all of that decomposes into points. Powers the
  * outer service-status ring + hover tooltip in the live graph.
+ *
+ * Works on a single-window `StatusData` slice (as returned by both
+ * /status/latest.json and /status/score{XYZ}.json).
  */
 export function computeWindowStats(
   status: StatusData,

@@ -6,11 +6,15 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  type ScorePayload,
+  type StatsBlock,
   type StatusData,
   type TeamData,
   type TeamWindowStats,
-  computeCumulativeScores,
+  availableWindows,
   computeWindowStats,
+  scoreFileName,
+  scoresAtWindow,
 } from '@/lib/scoring';
 import { readHslToken, useIsDark } from '@/lib/theme';
 import * as d3 from 'd3';
@@ -120,7 +124,12 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [teams, setTeams] = useState<TeamData | null>(null);
-  const [status, setStatus] = useState<StatusData | null>(null);
+  const [stats, setStats] = useState<StatsBlock | null>(null);
+  // Cache per-window status slices (teamId → window → service map). The
+  // latest window comes pre-loaded with /status/latest.json; older windows
+  // are fetched lazily from /status/score{N+1:03d}.json the first time the
+  // user navigates to them and stay cached for the session.
+  const [windowCache, setWindowCache] = useState<Record<number, StatusData>>({});
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const [hovered, setHovered] = useState<HoveredTeam | null>(null);
   const WINDOWS_PER_PAGE = isMobile ? 5 : 10;
@@ -138,28 +147,8 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
 
   const teamIds = useMemo(() => (teams ? Object.keys(teams) : []), [teams]);
 
-  const allServices = useMemo(() => {
-    if (!status) return [];
-    const firstTeamId = Object.keys(status)[0];
-    if (!firstTeamId) return [];
-    const services = new Set<string>();
-    for (const tw in status[firstTeamId]) {
-      for (const svc in status[firstTeamId][tw]) {
-        services.add(svc);
-      }
-    }
-    return Array.from(services).sort();
-  }, [status]);
-
-  const sampleTeamId = status !== null ? (Object.keys(status)[0] ?? null) : null;
-  const timeWindows: number[] = useMemo(
-    () =>
-      sampleTeamId && status?.[sampleTeamId]
-        ? Object.keys(status[sampleTeamId]).map((x) => parseInt(x))
-        : [],
-    [sampleTeamId, status]
-  );
-  const maxTimeWindow = timeWindows.length > 0 ? Math.max(...timeWindows) : null;
+  const timeWindows: number[] = useMemo(() => (stats ? availableWindows(stats) : []), [stats]);
+  const maxTimeWindow = stats ? stats.window : null;
 
   useEffect(() => {
     if (maxTimeWindow !== null && selectedTimeWindow === null) {
@@ -198,25 +187,63 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   }, []);
 
   useEffect(() => {
-    fetch('/status')
+    fetch('/status/latest.json')
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: ScorePayload) => {
         setTeams(data.teams);
-        setStatus(data.status);
+        setStats(data.stats);
+        // The latest payload already carries that window's status; seed the
+        // cache so we don't fetch it again.
+        setWindowCache((prev) => ({ ...prev, [data.stats.window]: data.status }));
         onDataUpdate(new Date());
       })
-      .catch((err) => console.error('Failed to fetch status:', err));
+      .catch((err) => console.error('Failed to fetch latest status:', err));
   }, [onDataUpdate]);
 
-  // Recompute cumulative scores up to the active window. Memoized so we
-  // don't re-run the O(T·W·S·N) scan on every render.
+  // Lazy-load older windows on demand. The latest window is seeded by the
+  // initial fetch above; everything else comes from /status/score{N+1:03d}.json
+  // and is cached for the rest of the session.
+  useEffect(() => {
+    if (activeTimeWindow == null) return;
+    if (windowCache[activeTimeWindow]) return;
+    let cancelled = false;
+    fetch(`/status/${scoreFileName(activeTimeWindow)}`)
+      .then((res) => res.json())
+      .then((data: ScorePayload) => {
+        if (cancelled) return;
+        setWindowCache((prev) =>
+          prev[data.stats.window] ? prev : { ...prev, [data.stats.window]: data.status }
+        );
+      })
+      .catch((err) => console.error(`Failed to fetch window ${activeTimeWindow}:`, err));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTimeWindow, windowCache]);
+
+  const status = activeTimeWindow != null ? (windowCache[activeTimeWindow] ?? null) : null;
+
+  const allServices = useMemo(() => {
+    if (!status || activeTimeWindow == null) return [];
+    const firstTeamId = Object.keys(status)[0];
+    if (!firstTeamId) return [];
+    const services = new Set<string>();
+    for (const svc in status[firstTeamId][activeTimeWindow] ?? {}) {
+      services.add(svc);
+    }
+    return Array.from(services).sort();
+  }, [status, activeTimeWindow]);
+
+  // Cumulative scores up to the active window come straight from the
+  // pre-computed `stats.aggregate` map — no scan needed.
   const scores = useMemo(
-    () => (status ? computeCumulativeScores(status, activeTimeWindow).scores : {}),
-    [status, activeTimeWindow]
+    () => (stats && activeTimeWindow != null ? scoresAtWindow(stats, activeTimeWindow) : {}),
+    [stats, activeTimeWindow]
   );
 
   const windowStats = useMemo<Record<string, TeamWindowStats> | null>(
-    () => (status && activeTimeWindow != null ? computeWindowStats(status, activeTimeWindow) : null),
+    () =>
+      status && activeTimeWindow != null ? computeWindowStats(status, activeTimeWindow) : null,
     [status, activeTimeWindow]
   );
 
@@ -787,7 +814,9 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
                       style={{ background: healthColor(1, isDark) }}
                     />
                   </div>
-                  <span className="text-muted-foreground">Patch score (red = broken → green = clean)</span>
+                  <span className="text-muted-foreground">
+                    Patch score (red = broken → green = clean)
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="relative inline-block h-3 w-3 rounded-[3px] bg-slate-500/40">
@@ -907,9 +936,7 @@ function TeamInspector({
           style={{ background: teamColor, boxShadow: `0 0 12px ${teamColor}` }}
         />
         <h4 className="text-foreground leading-none font-semibold">{teamName}</h4>
-        <span className="text-muted-foreground ml-auto text-xs">
-          Window {activeWindow ?? '—'}
-        </span>
+        <span className="text-muted-foreground ml-auto text-xs">Window {activeWindow ?? '—'}</span>
         <button
           onClick={onDismiss}
           aria-label="Close inspector"
@@ -970,10 +997,7 @@ function TeamInspector({
               >
                 Atk
               </th>
-              <th
-                className="px-1 py-1.5 text-right font-medium"
-                title="Attack reward = 6 × Atk"
-              >
+              <th className="px-1 py-1.5 text-right font-medium" title="Attack reward = 6 × Atk">
                 AtkΔ
               </th>
               <th
@@ -1078,15 +1102,11 @@ function TeamInspector({
                 Window
               </td>
               <td className="text-success px-1 py-1.5 text-right tabular-nums">
-                {stats.totals.operationalPoints > 0
-                  ? `+${stats.totals.operationalPoints}`
-                  : '0'}
+                {stats.totals.operationalPoints > 0 ? `+${stats.totals.operationalPoints}` : '0'}
               </td>
               <td
                 className={`px-1 py-1.5 text-right tabular-nums ${
-                  stats.totals.timesCompromised > 0
-                    ? 'text-destructive'
-                    : 'text-muted-foreground'
+                  stats.totals.timesCompromised > 0 ? 'text-destructive' : 'text-muted-foreground'
                 }`}
               >
                 {stats.totals.timesCompromised}
