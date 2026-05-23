@@ -102,7 +102,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
 
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 max-sm:flex-col max-sm:items-center">
         <div>
           <h2 className="text-foreground mb-2 text-2xl font-bold">Top 10 Teams</h2>
           <p className="text-muted-foreground">
@@ -169,8 +169,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
           <div className="text-muted-foreground flex items-center space-x-2">
             <div className="bg-success h-3 w-3 rounded-full" />
             <span>
-              Operational Service:{' '}
-              <span className="text-success font-semibold">Up to +42 pts</span>
+              Operational Service: <span className="text-success font-semibold">Up to +42 pts</span>
             </span>
           </div>
           <div className="text-muted-foreground flex items-center space-x-2">
@@ -210,8 +209,14 @@ function ChartViewToggle({
     <div
       role="tablist"
       aria-label="Chart view"
-      className="border-border bg-card inline-flex rounded-lg border p-0.5"
+      className="border-border bg-card relative inline-flex rounded-lg border p-0.5"
     >
+      <div
+        className="bg-primary absolute top-0.5 left-0.5 h-[calc(100%-4px)] w-1/2 rounded-md transition-all duration-300 ease-in-out"
+        style={{
+          transform: `translateX(${value === 'perWindow' ? '100%' : '0%'})`,
+        }}
+      />
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -220,10 +225,8 @@ function ChartViewToggle({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors ${
-              active
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+            className={`relative z-10 cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors ${
+              active ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {opt.label}
@@ -340,21 +343,11 @@ function LineChart({ data, mode }: LineChartProps) {
             tickfont: { color: muted },
             automargin: true,
           },
-          legend: {
-            orientation: 'h',
-            x: 0.5,
-            xanchor: 'center',
-            y: -0.18,
-            yanchor: 'top',
-            font: { color: fg, size: small ? 10 : 12 },
-            bgcolor: 'transparent',
-            itemwidth: 30,
-          },
-          margin: { t: 16, b: small ? 120 : 90, l: small ? 56 : 64, r: 16 },
+          showlegend: false,
+          margin: { t: 16, b: small ? 16 : 20, l: small ? 56 : 64, r: 16 },
           autosize: true,
           hovermode: small ? 'x unified' : 'closest',
           hoverlabel: { bgcolor: isDark ? '#0f1620' : '#ffffff', font: { color: fg } },
-          showlegend: true,
         };
       };
 
@@ -383,5 +376,24 @@ function LineChart({ data, mode }: LineChartProps) {
     };
   }, [data, isDark, yAxisTitle, hoverLabel, yRangeMode]);
 
-  return <div ref={chartRef} className="h-[360px] w-full sm:h-[480px] lg:h-[560px]" />;
+  return (
+    <>
+      <div ref={chartRef} className="h-[360px] w-full sm:h-[480px] lg:h-[560px]" />
+      {data.length > 0 && (
+        <div className="mt-2 flex justify-center">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+            {data.map((team) => (
+              <div key={team.teamId} className="flex items-center gap-2 truncate pl-2 sm:pl-0">
+                <span
+                  className="inline-block h-0.5 w-4 shrink-0 rounded-full"
+                  style={{ backgroundColor: team.color }}
+                />
+                <span className="text-muted-foreground truncate text-xs">{team.teamName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
