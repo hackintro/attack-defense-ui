@@ -796,7 +796,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
               <div className="text-muted-foreground space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span>Operational Service:</span>
-                  <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+                  <span className="text-success font-semibold">Up to +42 pts</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Successful Attack:</span>

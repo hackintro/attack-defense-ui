@@ -170,7 +170,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
             <div className="bg-success h-3 w-3 rounded-full" />
             <span>
               Operational Service:{' '}
-              <span className="text-success font-semibold">+42 pts (scaled by patch diff)</span>
+              <span className="text-success font-semibold">Up to +42 pts</span>
             </span>
           </div>
           <div className="text-muted-foreground flex items-center space-x-2">
