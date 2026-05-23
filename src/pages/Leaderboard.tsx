@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import {
   type ScorePayload,
+  type SeriesMode,
   type StatsBlock,
   type TeamData,
   type TeamScoreRow,
@@ -48,6 +49,7 @@ function rankMedalClasses(rank: number): string {
 export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [stats, setStats] = useState<StatsBlock | null>(null);
+  const [chartView, setChartView] = useState<SeriesMode>('cumulative');
 
   useEffect(() => {
     fetch('/status/latest.json')
@@ -67,14 +69,28 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
 
   const scoreHistory = useMemo<TeamSeries[]>(() => {
     if (!teams || !stats) return [];
-    const series = seriesFromAggregate(teams, stats);
-    const top = topNSeries(series, 10);
-    return top.map((s, i) => ({
+    // Rank top 10 by cumulative score so the same teams (in the same
+    // legend order/colors) show up regardless of which view is active —
+    // toggling shouldn't reshuffle the chart.
+    const cumulative = seriesFromAggregate(teams, stats, 'cumulative');
+    const topCumulative = topNSeries(cumulative, 10);
+    const orderedIds = topCumulative.map((s) => s.teamId);
+
+    const source =
+      chartView === 'cumulative'
+        ? topCumulative
+        : (() => {
+            const perWindow = seriesFromAggregate(teams, stats, 'perWindow');
+            const byId = new Map(perWindow.map((s) => [s.teamId, s]));
+            return orderedIds.map((id) => byId.get(id)!).filter(Boolean);
+          })();
+
+    return source.map((s, i) => ({
       ...s,
       // attach a stable D3 categorical color for the chart legend
       color: d3.schemeCategory10[i % 10],
     })) as TeamSeries[];
-  }, [teams, stats]);
+  }, [teams, stats, chartView]);
 
   if (!teams || !stats) {
     return (
@@ -86,13 +102,20 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
 
   return (
     <main className="container mx-auto flex-1 px-4 py-6">
-      <div className="mb-6">
-        <h2 className="text-foreground mb-2 text-2xl font-bold">Top 10 Teams</h2>
-        <p className="text-muted-foreground">Score progression over time for the leading teams</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-foreground mb-2 text-2xl font-bold">Top 10 Teams</h2>
+          <p className="text-muted-foreground">
+            {chartView === 'cumulative'
+              ? 'Cumulative score progression for the leading teams'
+              : 'Per-window score deltas for the leading teams'}
+          </p>
+        </div>
+        <ChartViewToggle value={chartView} onChange={setChartView} />
       </div>
 
       <div className="bg-card border-border mb-2 w-full rounded-lg border p-2 sm:p-4">
-        <LineChart data={scoreHistory} />
+        <LineChart data={scoreHistory} mode={chartView} />
       </div>
 
       <div className="mb-6">
@@ -168,8 +191,52 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
   );
 }
 
+/**
+ * Segmented "Cumulative / Per window" switch above the chart. Matches the
+ * pill-style buttons used elsewhere in the app so the chrome stays cohesive.
+ */
+function ChartViewToggle({
+  value,
+  onChange,
+}: {
+  value: SeriesMode;
+  onChange: (mode: SeriesMode) => void;
+}) {
+  const options: { value: SeriesMode; label: string }[] = [
+    { value: 'cumulative', label: 'Cumulative' },
+    { value: 'perWindow', label: 'Per window' },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Chart view"
+      className="border-border bg-card inline-flex rounded-lg border p-0.5"
+    >
+      {options.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={`cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors ${
+              active
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface LineChartProps {
   data: (TeamSeries & { color?: string })[];
+  mode: SeriesMode;
 }
 
 /**
@@ -191,9 +258,15 @@ function pickXDtick(maxWindow: number): number {
  * instead of the source `plotly.js` package because Vite 8 doesn't polyfill
  * Node built-ins like `stream`, which the source build expects.
  */
-function LineChart({ data }: LineChartProps) {
+function LineChart({ data, mode }: LineChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const isDark = useIsDark();
+  const yAxisTitle = mode === 'cumulative' ? 'Total score' : 'Score this window';
+  const hoverLabel = mode === 'cumulative' ? 'Total' : 'Window Δ';
+  // Cumulative scores are always ≥ 0 by construction, so anchoring the
+  // axis at zero gives a clean baseline. Per-window deltas dip negative
+  // when defenses break — let Plotly autoscale naturally there.
+  const yRangeMode: 'tozero' | 'normal' = mode === 'cumulative' ? 'tozero' : 'normal';
 
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return;
@@ -233,7 +306,7 @@ function LineChart({ data }: LineChartProps) {
         name: team.teamName,
         line: { color: team.color, width: 2.5, shape: 'spline' as const },
         marker: { size: 6, color: team.color },
-        hovertemplate: '<b>%{fullData.name}</b><br>Window %{x}<br>Score %{y:,}<extra></extra>',
+        hovertemplate: `<b>%{fullData.name}</b><br>Window %{x}<br>${hoverLabel} %{y:,}<extra></extra>`,
       }));
 
       // Resolve theme tokens at chart-time so light/dark match the design system.
@@ -257,11 +330,11 @@ function LineChart({ data }: LineChartProps) {
             tickfont: { color: muted },
           },
           yaxis: {
-            title: { text: 'Score', font: { color: muted, size: small ? 11 : 13 } },
+            title: { text: yAxisTitle, font: { color: muted, size: small ? 11 : 13 } },
             gridcolor: grid,
             zerolinecolor: grid,
             tickcolor: grid,
-            rangemode: 'tozero',
+            rangemode: yRangeMode,
             nticks: small ? 5 : 8,
             tickformat: ',d',
             tickfont: { color: muted },
@@ -308,7 +381,7 @@ function LineChart({ data }: LineChartProps) {
       if (handler) window.removeEventListener('resize', handler);
       if (plotlyRef && node) plotlyRef.default.purge(node);
     };
-  }, [data, isDark]);
+  }, [data, isDark, yAxisTitle, hoverLabel, yRangeMode]);
 
   return <div ref={chartRef} className="h-[360px] w-full sm:h-[480px] lg:h-[560px]" />;
 }

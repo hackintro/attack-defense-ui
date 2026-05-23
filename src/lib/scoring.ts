@@ -142,20 +142,29 @@ export function rankFromStats(teams: TeamData, stats: StatsBlock): TeamScoreRow[
     .map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
+export type SeriesMode = 'cumulative' | 'perWindow';
+
 /**
- * Per-team cumulative-score series — one point per window in
- * `stats.aggregate`, with `score` being the running sum of per-window
- * deltas through that window. Ascending window order; matches the shape
- * the line chart in Leaderboard.tsx expects.
+ * Per-team score series, one point per window in `stats.aggregate`.
+ *   • `cumulative` — running sum of per-window deltas through that window
+ *     (what the leaderboard ranks by).
+ *   • `perWindow`  — the raw delta for that window alone (positive when a
+ *     team had a good window, negative when defense broke down).
+ * Windows are returned in ascending order.
  */
-export function seriesFromAggregate(teams: TeamData, stats: StatsBlock): TeamSeries[] {
+export function seriesFromAggregate(
+  teams: TeamData,
+  stats: StatsBlock,
+  mode: SeriesMode = 'cumulative'
+): TeamSeries[] {
   const windows = availableWindows(stats);
   return Object.keys(stats.aggregate).map((teamId) => {
     const teamMap = stats.aggregate[teamId];
     let cum = 0;
     const values: ScorePoint[] = windows.map((w) => {
-      cum += teamMap[w.toString()] ?? 0;
-      return { window: w, score: cum };
+      const delta = teamMap[w.toString()] ?? 0;
+      cum += delta;
+      return { window: w, score: mode === 'cumulative' ? cum : delta };
     });
     return {
       teamId,
