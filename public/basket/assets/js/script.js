@@ -218,8 +218,12 @@
       var end_location;
 
       function click(pointer) {
-        var bodies = game.physics.p2.hitTest(pointer.position, [ball.body]);
-        if (bodies.length) {
+        // Check if touch/click is near the ball instead of using p2 hitTest
+        var dx = pointer.x - ball.x;
+        var dy = pointer.y - ball.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < ball.width / 2 + 100) {  // +100px forgiveness for touch
           start_location = [pointer.x, pointer.y];
           isDown = true;
           location_interval = setInterval(
