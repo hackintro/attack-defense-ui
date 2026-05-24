@@ -223,7 +223,7 @@
         var dy = pointer.y - ball.y;
         var dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < ball.width / 2 + 100) {  // +100px forgiveness for touch
+        if (dist < ball.width / 2 + 150) {  // +150px forgiveness for touch
           start_location = [pointer.x, pointer.y];
           isDown = true;
           location_interval = setInterval(
