@@ -196,10 +196,41 @@ const Footer = () => (
 );
 
 /**
- * Floating "ΘΡΥΛΟΣ" badge that only mounts in OSFP mode. Sits in the
- * bottom-right corner, doesn't intercept clicks, and bounces a basketball
- * next to a Final Four call-out. Pure chrome — every other view stays
- * exactly as it was.
+ * Stylized riff on the Olympiacos crest — a young athlete (ephebe) wearing
+ * a laurel wreath. Geometric, intentionally non-photo-real so it reads as
+ * "vibe", not as the trademarked logo. Renders in whatever `currentColor`
+ * is so it can sit on red, white, or anything in between.
+ */
+const OSFPLaurelHead = ({ size = 24 }: { size?: number }) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Laurel wreath — two arcs of leaves crowning the head */}
+    <g>
+      <ellipse cx="18" cy="22" rx="2.6" ry="5.4" transform="rotate(-45 18 22)" />
+      <ellipse cx="22" cy="15" rx="2.6" ry="5.4" transform="rotate(-25 22 15)" />
+      <ellipse cx="28" cy="11" rx="2.6" ry="5.4" transform="rotate(-10 28 11)" />
+      <ellipse cx="36" cy="11" rx="2.6" ry="5.4" transform="rotate(10 36 11)" />
+      <ellipse cx="42" cy="15" rx="2.6" ry="5.4" transform="rotate(25 42 15)" />
+      <ellipse cx="46" cy="22" rx="2.6" ry="5.4" transform="rotate(45 46 22)" />
+    </g>
+    {/* Head */}
+    <circle cx="32" cy="30" r="9" />
+    {/* Shoulders / bust */}
+    <path d="M18 58 C18 47 24 42 32 42 C40 42 46 47 46 58 Z" />
+  </svg>
+);
+
+/**
+ * Floating "ΘΡΥΛΟΣ" badge that only mounts in OSFP mode. Bottom-right,
+ * doesn't intercept clicks. Carries the stylized ephebe crest, club name,
+ * basketball, and trophy — designed so a viewer who's never heard of
+ * Olympiacos still knows exactly what theme they're looking at.
  */
 const OSFPCelebration = () => {
   const isOSFP = useIsOSFP();
@@ -207,22 +238,85 @@ const OSFPCelebration = () => {
   return (
     <div
       aria-hidden
-      className="animate-osfp-slide-in pointer-events-none fixed right-4 bottom-4 z-50 flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-sm font-bold text-white shadow-lg"
+      className="animate-osfp-slide-in pointer-events-none fixed right-4 bottom-4 z-50 flex items-center gap-2.5 rounded-full border border-white/25 py-2 pr-4 pl-2 text-sm font-bold text-white shadow-lg"
       style={{
-        background: 'linear-gradient(135deg, hsl(353 88% 42%), hsl(353 88% 32%))',
-        boxShadow: '0 10px 30px -10px hsl(353 88% 42% / 0.55)',
+        background: 'linear-gradient(135deg, hsl(353 88% 42%), hsl(353 88% 30%))',
+        boxShadow: '0 12px 32px -10px hsl(353 88% 42% / 0.6)',
       }}
     >
+      <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-[hsl(353_88%_42%)] shadow-inner">
+        <OSFPLaurelHead size={18} />
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-[10px] font-medium tracking-[0.18em] text-white/80 uppercase">
+          Ολυμπιακός Β.C.
+        </span>
+        <span className="text-sm tracking-wide">ΘΡΥΛΟΣ · Final Four</span>
+      </span>
       <span className="animate-osfp-bounce inline-block text-base leading-none">🏀</span>
-      <span className="tracking-wide">ΘΡΥΛΟΣ · Final Four</span>
       <span className="text-base leading-none">🏆</span>
     </div>
   );
 };
 
+/**
+ * Tongue-in-cheek "we're wrapping the CTF before tipoff" PSA. Sits right
+ * under the navbar in OSFP mode so the joke lands the moment a viewer
+ * switches in. Bold red strip with white text — impossible to miss, but
+ * still pointer-event-passive so it never blocks interactions below.
+ */
+const OSFPTipoffBanner = () => {
+  const isOSFP = useIsOSFP();
+  if (!isOSFP) return null;
+  return (
+    <div
+      role="note"
+      aria-label="Olympiacos Final Four tipoff notice"
+      className="w-full px-4 py-2 text-center text-sm font-semibold text-white"
+      style={{
+        background: 'linear-gradient(90deg, hsl(353 88% 36%), hsl(353 88% 46%), hsl(353 88% 36%))',
+        boxShadow: 'inset 0 -1px 0 hsl(353 88% 28%)',
+      }}
+    >
+      <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+        <span aria-hidden>🏀</span>
+        <span>
+          Pencils down at <span className="font-bold tracking-wide">20:59</span> —{' '}
+          <span className="hidden sm:inline">Final Four </span>tipoff waits for no shell.
+        </span>
+        <span aria-hidden>🏆</span>
+      </span>
+    </div>
+  );
+};
+
+/**
+ * Bold red+white vertical-stripe band — the iconic ερυθρόλευκοι kit
+ * pattern, but as a slim 8px ribbon across the viewport. Renders only in
+ * OSFP mode; used at the top and bottom of the page so every view is
+ * unmistakably Olympiacos without compromising readability.
+ */
+const OSFPStripeBar = () => {
+  const isOSFP = useIsOSFP();
+  if (!isOSFP) return null;
+  return (
+    <div
+      aria-hidden
+      className="h-2 w-full shrink-0"
+      style={{
+        background:
+          'repeating-linear-gradient(90deg, hsl(353 88% 42%) 0 28px, hsl(0 0% 100%) 28px 56px)',
+        boxShadow: 'inset 0 -1px 0 hsl(353 35% 80%)',
+      }}
+    />
+  );
+};
+
 const Layout = ({ children, lastUpdateTime }: LayoutProps) => (
   <div className="bg-background flex min-h-screen flex-col">
+    <OSFPStripeBar />
     <Navbar lastUpdateTime={lastUpdateTime} />
+    <OSFPTipoffBanner />
     <div className="text-foreground top-16 z-50 mx-auto w-full px-4 py-2 text-right text-sm">
       Stuck?{' '}
       <a
@@ -235,6 +329,7 @@ const Layout = ({ children, lastUpdateTime }: LayoutProps) => (
       </a>
     </div>
     <main className="grow overflow-hidden">{children}</main>
+    <OSFPStripeBar />
     <Footer />
     <OSFPCelebration />
   </div>
