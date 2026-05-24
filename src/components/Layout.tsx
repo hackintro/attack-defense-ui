@@ -97,7 +97,7 @@ const OSFPToggle = ({ size = 16 }: { size?: number }) => {
         aria-label={active ? 'Exit OSFP theme' : 'Enable OSFP (Olympiacos) theme'}
         title={active ? 'Πάμε Θρύλε! Hold to hoop.' : 'OSFP — Final Four edition'}
         className={cn(
-          'flex cursor-pointer items-center justify-center rounded-lg border p-2 text-sm leading-none transition-opacity hover:opacity-80 select-none',
+          'flex cursor-pointer items-center justify-center rounded-lg border p-2 text-sm leading-none transition-opacity select-none hover:opacity-80',
           active
             ? 'bg-primary text-primary-foreground border-primary shadow-primary/40 shadow-md'
             : 'bg-card text-foreground border-border'
@@ -109,7 +109,10 @@ const OSFPToggle = ({ size = 16 }: { size?: number }) => {
         </span>
       </button>
       <Dialog open={showGame} onOpenChange={setShowGame}>
-        <DialogContent aria-describedby={undefined} className="max-w-lg sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          aria-describedby={undefined}
+          className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-[480px]"
+        >
           <DialogHeader>
             <DialogTitle>🏀 Basketball Minigame</DialogTitle>
           </DialogHeader>
@@ -285,7 +288,7 @@ const OSFPCelebration = () => {
   return (
     <div
       aria-hidden
-      className="animate-osfp-slide-in pointer-events-none fixed bottom-4 left-1/2 z-50 flex w-max -translate-x-1/2 items-center gap-2.5 rounded-full border border-white/25 py-2 pr-4 pl-2 text-sm font-bold text-white shadow-lg sm:left-auto sm:right-4 sm:translate-x-0"
+      className="animate-osfp-slide-in pointer-events-none fixed bottom-4 left-1/2 z-50 flex w-max -translate-x-1/2 items-center gap-2.5 rounded-full border border-white/25 py-2 pr-4 pl-2 text-sm font-bold text-white shadow-lg sm:right-4 sm:left-auto sm:translate-x-0"
       style={{
         background: 'linear-gradient(135deg, hsl(353 88% 42%), hsl(353 88% 30%))',
         boxShadow: '0 12px 32px -10px hsl(353 88% 42% / 0.6)',
