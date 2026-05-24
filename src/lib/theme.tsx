@@ -2,11 +2,14 @@ import { getCookie, setCookie } from '@/utils/cookies';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode = 'dark' | 'light' | 'osfp';
 
 interface ThemeContextValue {
   theme: ThemeMode;
+  /** Cycle the everyday themes (dark ↔ light). Always exits OSFP first. */
   toggleTheme: () => void;
+  /** Switch into OSFP, or back out to dark. Bound to the basketball button. */
+  toggleOSFP: () => void;
   setTheme: (mode: ThemeMode) => void;
 }
 
@@ -17,7 +20,8 @@ const COOKIE_KEY = 'attack-defense-theme';
 function readInitialTheme(): ThemeMode {
   if (typeof document === 'undefined') return 'dark';
   const saved = getCookie(COOKIE_KEY);
-  return saved === 'light' ? 'light' : 'dark';
+  if (saved === 'light' || saved === 'osfp') return saved;
+  return 'dark';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -26,16 +30,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setCookie(COOKIE_KEY, theme, 7);
     const root = document.documentElement;
+    // The .dark and .osfp classes are mutually exclusive — only one of
+    // them ever wins. OSFP is a light-based palette so colorScheme stays
+    // 'light' for native scrollbars/form controls.
     root.classList.toggle('dark', theme === 'dark');
-    // Hint native UI (scrollbars, form controls) to follow the theme.
-    root.style.colorScheme = theme;
+    root.classList.toggle('osfp', theme === 'osfp');
+    root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
   }, [theme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
       setTheme: setThemeState,
-      toggleTheme: () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark')),
+      toggleTheme: () =>
+        setThemeState((t) => {
+          // Sun/Moon button isn't aware of OSFP — if we're in it, bounce
+          // back to the user's "normal" default (dark) rather than
+          // silently leaving them in red.
+          if (t === 'osfp') return 'dark';
+          return t === 'dark' ? 'light' : 'dark';
+        }),
+      toggleOSFP: () => setThemeState((t) => (t === 'osfp' ? 'dark' : 'osfp')),
     }),
     [theme]
   );
@@ -50,6 +65,7 @@ export function useTheme(): ThemeContextValue {
 }
 
 export const useIsDark = (): boolean => useTheme().theme === 'dark';
+export const useIsOSFP = (): boolean => useTheme().theme === 'osfp';
 
 /**
  * Read a CSS HSL token (e.g. "--foreground") from the live document.

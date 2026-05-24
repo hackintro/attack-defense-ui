@@ -1,5 +1,5 @@
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useTheme } from '@/lib/theme';
+import { useIsOSFP, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { Menu, Moon, Sun } from 'lucide-react';
 import React from 'react';
@@ -50,6 +50,36 @@ interface NavbarProps {
   lastUpdateTime: Date | null;
 }
 
+/**
+ * Basketball "OSFP mode" button. Lives next to the dark/light toggle and
+ * lights up red when the theme is active — a small joke for the Olympiacos
+ * Final Four day, intentionally opt-in so the everyday dark/light flow is
+ * untouched.
+ */
+const OSFPToggle = ({ size = 16 }: { size?: number }) => {
+  const { theme, toggleOSFP } = useTheme();
+  const active = theme === 'osfp';
+  return (
+    <button
+      onClick={toggleOSFP}
+      aria-pressed={active}
+      aria-label={active ? 'Exit OSFP theme' : 'Enable OSFP (Olympiacos) theme'}
+      title={active ? 'Πάμε Θρύλε! Click to exit.' : 'OSFP — Final Four edition'}
+      className={cn(
+        'flex cursor-pointer items-center justify-center rounded-lg border p-2 text-sm leading-none transition-opacity hover:opacity-80',
+        active
+          ? 'bg-primary text-primary-foreground border-primary shadow-primary/40 shadow-md'
+          : 'bg-card text-foreground border-border'
+      )}
+      style={{ width: size + 16, height: size + 16 }}
+    >
+      <span aria-hidden className="text-base leading-none">
+        🏀
+      </span>
+    </button>
+  );
+};
+
 const Navbar = ({ lastUpdateTime }: NavbarProps) => {
   const { theme, toggleTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = React.useState(false);
@@ -71,18 +101,22 @@ const Navbar = ({ lastUpdateTime }: NavbarProps) => {
           <div className="text-muted-foreground hidden text-sm xl:block">
             Last Update: {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Never'}
           </div>
-          <button
-            onClick={toggleTheme}
-            aria-label={themeLabel}
-            aria-pressed={isDark}
-            className="bg-card border-border text-foreground cursor-pointer rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
-          >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+          <div className="flex items-center space-x-2">
+            <OSFPToggle size={16} />
+            <button
+              onClick={toggleTheme}
+              aria-label={themeLabel}
+              aria-pressed={isDark}
+              className="bg-card border-border text-foreground cursor-pointer rounded-lg border p-2 text-sm transition-opacity hover:opacity-80"
+            >
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile */}
-        <div className="flex items-center space-x-4 lg:hidden">
+        <div className="flex items-center space-x-2 lg:hidden">
+          <OSFPToggle size={18} />
           <button
             onClick={toggleTheme}
             aria-label={themeLabel}
@@ -161,6 +195,31 @@ const Footer = () => (
   </footer>
 );
 
+/**
+ * Floating "ΘΡΥΛΟΣ" badge that only mounts in OSFP mode. Sits in the
+ * bottom-right corner, doesn't intercept clicks, and bounces a basketball
+ * next to a Final Four call-out. Pure chrome — every other view stays
+ * exactly as it was.
+ */
+const OSFPCelebration = () => {
+  const isOSFP = useIsOSFP();
+  if (!isOSFP) return null;
+  return (
+    <div
+      aria-hidden
+      className="animate-osfp-slide-in pointer-events-none fixed right-4 bottom-4 z-50 flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-sm font-bold text-white shadow-lg"
+      style={{
+        background: 'linear-gradient(135deg, hsl(353 88% 42%), hsl(353 88% 32%))',
+        boxShadow: '0 10px 30px -10px hsl(353 88% 42% / 0.55)',
+      }}
+    >
+      <span className="animate-osfp-bounce inline-block text-base leading-none">🏀</span>
+      <span className="tracking-wide">ΘΡΥΛΟΣ · Final Four</span>
+      <span className="text-base leading-none">🏆</span>
+    </div>
+  );
+};
+
 const Layout = ({ children, lastUpdateTime }: LayoutProps) => (
   <div className="bg-background flex min-h-screen flex-col">
     <Navbar lastUpdateTime={lastUpdateTime} />
@@ -177,6 +236,7 @@ const Layout = ({ children, lastUpdateTime }: LayoutProps) => (
     </div>
     <main className="grow overflow-hidden">{children}</main>
     <Footer />
+    <OSFPCelebration />
   </div>
 );
 

@@ -132,6 +132,58 @@
   }
 
   /* ────────────────────────────────────────────────────────────────────────
+     OSFP — Olympiacos B.C. "Final Four" edition (opt-in, not the default)
+     Ερυθρόλευκοι red & white with a touch of championship gold.
+     Pantone 186 / Olympiacos crimson is the primary; emerald/amber/blue
+     status colors are kept so the live-graph traffic-light cues still
+     read at a glance.
+     ──────────────────────────────────────────────────────────────────────── */
+  .osfp {
+    --background: 0 30% 98%;
+    --foreground: 350 70% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 350 70% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 350 70% 16%;
+
+    --primary: 353 88% 42%; /* Olympiacos red */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 350 70% 16%;
+
+    --muted: 0 25% 95%;
+    --muted-foreground: 353 25% 38%;
+
+    --accent: 45 95% 50%; /* championship gold */
+    --accent-foreground: 350 70% 16%;
+
+    --destructive: 353 88% 42%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 84% 31%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 28 95% 44%;
+    --warning-foreground: 350 70% 16%;
+
+    --info: 225 83% 53%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 353 35% 88%;
+    --input: 353 35% 88%;
+    --ring: 353 88% 42%;
+
+    --chart-1: 353 88% 42%;
+    --chart-2: 45 95% 50%;
+    --chart-3: 350 70% 16%;
+    --chart-4: 0 0% 55%;
+    --chart-5: 353 60% 62%;
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
      Cyber Noir — dark mode (default)
      Near-black slate base, cyan-400 primary, fuchsia-600 accent.
      ──────────────────────────────────────────────────────────────────────── */
@@ -204,5 +256,34 @@
       opacity: 1;
       transform: scale(1);
     }
+  }
+
+  /* OSFP-mode chrome — a bouncing basketball badge with a wobble that
+     reads as "celebrate" without crossing into distracting territory. */
+  @keyframes osfpBounce {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-12deg);
+    }
+    50% {
+      transform: translateY(-6px) rotate(12deg);
+    }
+  }
+  .animate-osfp-bounce {
+    animation: osfpBounce 0.9s ease-in-out infinite;
+  }
+
+  @keyframes osfpSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .animate-osfp-slide-in {
+    animation: osfpSlideIn 0.35s ease-out;
   }
 }
