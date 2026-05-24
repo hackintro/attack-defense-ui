@@ -231,6 +231,24 @@
     --chart-4: 43 96% 56%;
     --chart-5: 213 94% 68%;
   }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     OSFP + dark mode — keep dark backgrounds, override to red links/borders
+     ──────────────────────────────────────────────────────────────────────── */
+  .osfp.dark {
+    --primary: 353 88% 42%;
+    --primary-foreground: 0 0% 100%;
+    --border: 353 35% 30%;
+    --input: 353 35% 30%;
+    --ring: 353 88% 42%;
+    --accent: 45 95% 50%;
+    --accent-foreground: 350 70% 16%;
+    --chart-1: 353 88% 42%;
+    --chart-2: 45 95% 50%;
+    --chart-3: 350 70% 16%;
+    --chart-4: 0 0% 55%;
+    --chart-5: 353 60% 62%;
+  }
 }
 
 @layer base {

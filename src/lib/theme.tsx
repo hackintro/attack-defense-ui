@@ -40,7 +40,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setCookie(OSFP_COOKIE_KEY, osfpEnabled ? 'true' : 'false', 7);
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
-    root.classList.toggle('osfp', false);
+    root.classList.toggle('osfp', osfpEnabled);
     root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
   }, [theme, osfpEnabled]);
 
