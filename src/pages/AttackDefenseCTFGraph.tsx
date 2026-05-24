@@ -16,7 +16,7 @@ import {
   scoreFileName,
   scoresAtWindow,
 } from '@/lib/scoring';
-import { readHslToken, useIsDark } from '@/lib/theme';
+import { readHslToken, useIsDark, useIsOSFP } from '@/lib/theme';
 import * as d3 from 'd3';
 import { ChevronDown, ChevronLeft, ChevronRight, Filter, Info, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -141,6 +141,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
 
   const [windowPage, setWindowPage] = useState(0);
   const isDark = useIsDark();
+  const isOSFP = useIsOSFP();
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [scoringOpen, setScoringOpen] = useState(false);
@@ -553,7 +554,52 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
         .attr('stroke', color)
         .attr('stroke-width', 2);
 
-      const dot = g.append('circle').attr('r', 6).attr('fill', color);
+      // OSFP day: every attack arrives as a spinning basketball instead of
+      // a flat colored dot. The body keeps the per-service color (the trail
+      // already carries it, but having both match makes the swarm read
+      // better) underneath a translucent orange wash so it still reads as
+      // a basketball at a glance.
+      const dot = g.append('g');
+      if (isOSFP) {
+        dot
+          .append('circle')
+          .attr('r', 7)
+          .attr('fill', '#e2761b')
+          .attr('stroke', '#2a1810')
+          .attr('stroke-width', 0.8);
+        const seamColor = '#1a1a1a';
+        const seamWidth = 0.7;
+        // Vertical seam + a slightly curved equator + two side arcs —
+        // the four-line pattern that reads as "basketball" even at 14px.
+        dot
+          .append('line')
+          .attr('x1', 0)
+          .attr('y1', -7)
+          .attr('x2', 0)
+          .attr('y2', 7)
+          .attr('stroke', seamColor)
+          .attr('stroke-width', seamWidth);
+        dot
+          .append('path')
+          .attr('d', 'M -7 0 Q 0 -1.5 7 0')
+          .attr('stroke', seamColor)
+          .attr('stroke-width', seamWidth)
+          .attr('fill', 'none');
+        dot
+          .append('path')
+          .attr('d', 'M -5 -5 Q -7.5 0 -5 5')
+          .attr('stroke', seamColor)
+          .attr('stroke-width', seamWidth)
+          .attr('fill', 'none');
+        dot
+          .append('path')
+          .attr('d', 'M 5 -5 Q 7.5 0 5 5')
+          .attr('stroke', seamColor)
+          .attr('stroke-width', seamWidth)
+          .attr('fill', 'none');
+      } else {
+        dot.append('circle').attr('r', 6).attr('fill', color);
+      }
 
       dot
         .transition()
@@ -563,7 +609,10 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
           return function (t: number) {
             const point = path.node()?.getPointAtLength(t * totalLength);
             if (point) {
-              dot.attr('cx', point.x).attr('cy', point.y);
+              // Two full rotations across the trajectory — enough that the
+              // seams visibly tumble, not so much that they blur.
+              const spin = isOSFP ? ` rotate(${t * 720})` : '';
+              dot.attr('transform', `translate(${point.x}, ${point.y})${spin}`);
             }
             const trailLength = t * totalLength;
             trail.attr('d', pathD).attr('stroke-dasharray', `${trailLength},${totalLength}`);
@@ -647,6 +696,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
     isMobile,
     activeTimeWindow,
     isDark,
+    isOSFP,
     filterSrc,
     filterDst,
     filterServices,
