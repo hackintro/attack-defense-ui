@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsOSFP, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -57,26 +58,72 @@ interface NavbarProps {
  * untouched.
  */
 const OSFPToggle = ({ size = 16 }: { size?: number }) => {
-  const { theme, toggleOSFP } = useTheme();
-  const active = theme === 'osfp';
+  const { isOsfpEnabled, toggleOSFP } = useTheme();
+  const [showGame, setShowGame] = React.useState(false);
+  const holdTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = React.useRef(false);
+  const active = isOsfpEnabled;
+
+  const handlePointerDown = () => {
+    longPressed.current = false;
+    holdTimer.current = setTimeout(() => {
+      longPressed.current = true;
+      setShowGame(true);
+    }, 1000);
+  };
+
+  const handlePointerUp = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (!longPressed.current) {
+      toggleOSFP();
+    }
+  };
+
   return (
-    <button
-      onClick={toggleOSFP}
-      aria-pressed={active}
-      aria-label={active ? 'Exit OSFP theme' : 'Enable OSFP (Olympiacos) theme'}
-      title={active ? 'Πάμε Θρύλε! Click to exit.' : 'OSFP — Final Four edition'}
-      className={cn(
-        'flex cursor-pointer items-center justify-center rounded-lg border p-2 text-sm leading-none transition-opacity hover:opacity-80',
-        active
-          ? 'bg-primary text-primary-foreground border-primary shadow-primary/40 shadow-md'
-          : 'bg-card text-foreground border-border'
-      )}
-      style={{ width: size + 16, height: size + 16 }}
-    >
-      <span aria-hidden className="text-base leading-none">
-        🏀
-      </span>
-    </button>
+    <>
+      <button
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          if (holdTimer.current) {
+            clearTimeout(holdTimer.current);
+            holdTimer.current = null;
+          }
+        }}
+        aria-pressed={active}
+        aria-label={active ? 'Exit OSFP theme' : 'Enable OSFP (Olympiacos) theme'}
+        title={active ? 'Πάμε Θρύλε! Hold to hoop.' : 'OSFP — Final Four edition'}
+        className={cn(
+          'flex cursor-pointer items-center justify-center rounded-lg border p-2 text-sm leading-none transition-opacity hover:opacity-80 select-none',
+          active
+            ? 'bg-primary text-primary-foreground border-primary shadow-primary/40 shadow-md'
+            : 'bg-card text-foreground border-border'
+        )}
+        style={{ width: size + 16, height: size + 16 }}
+      >
+        <span aria-hidden className="text-base leading-none">
+          🏀
+        </span>
+      </button>
+      <Dialog open={showGame} onOpenChange={setShowGame}>
+        <DialogContent aria-describedby={undefined} className="max-w-lg sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>🏀 Basketball Minigame</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-hidden rounded-lg">
+            <iframe
+              src="/basket/index.html"
+              className="w-full border-0"
+              style={{ aspectRatio: '400 / 625' }}
+              title="Basketball Game"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
@@ -238,7 +285,7 @@ const OSFPCelebration = () => {
   return (
     <div
       aria-hidden
-      className="animate-osfp-slide-in pointer-events-none fixed right-4 bottom-4 z-50 flex items-center gap-2.5 rounded-full border border-white/25 py-2 pr-4 pl-2 text-sm font-bold text-white shadow-lg"
+      className="animate-osfp-slide-in pointer-events-none fixed bottom-4 left-1/2 z-50 flex w-max -translate-x-1/2 items-center gap-2.5 rounded-full border border-white/25 py-2 pr-4 pl-2 text-sm font-bold text-white shadow-lg sm:left-auto sm:right-4 sm:translate-x-0"
       style={{
         background: 'linear-gradient(135deg, hsl(353 88% 42%), hsl(353 88% 30%))',
         boxShadow: '0 12px 32px -10px hsl(353 88% 42% / 0.6)',
@@ -249,7 +296,7 @@ const OSFPCelebration = () => {
       </span>
       <span className="flex flex-col leading-tight">
         <span className="text-[10px] font-medium tracking-[0.18em] text-white/80 uppercase">
-          Ολυμπιακός Β.C.
+          Ολυμπιακος Β.C.
         </span>
         <span className="text-sm tracking-wide">ΘΡΥΛΟΣ · Final Four</span>
       </span>
