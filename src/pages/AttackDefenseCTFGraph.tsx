@@ -7,14 +7,15 @@ import {
 } from '@/components/ui/dialog';
 import {
   type ScorePayload,
+  STATUS_LATEST_URL,
   type StatsBlock,
   type StatusData,
   type TeamData,
   type TeamWindowStats,
   availableWindows,
   computeWindowStats,
-  scoreFileName,
   scoresAtWindow,
+  statusUrl,
 } from '@/lib/scoring';
 import { readHslToken, useIsDark, useIsOSFP } from '@/lib/theme';
 import * as d3 from 'd3';
@@ -128,9 +129,9 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   const [teams, setTeams] = useState<TeamData | null>(null);
   const [stats, setStats] = useState<StatsBlock | null>(null);
   // Cache per-window status slices (teamId → window → service map). The
-  // latest window comes pre-loaded with /status/latest.json; older windows
-  // are fetched lazily from /status/score{N+1:03d}.json the first time the
-  // user navigates to them and stay cached for the session.
+  // latest window comes pre-loaded with /status/latest; older windows are
+  // fetched lazily from /status/{N} the first time the user navigates to
+  // them and stay cached for the session.
   const [windowCache, setWindowCache] = useState<Record<number, StatusData>>({});
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const [hovered, setHovered] = useState<HoveredTeam | null>(null);
@@ -192,7 +193,7 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   }, []);
 
   useEffect(() => {
-    fetch('/status/latest.json')
+    fetch(STATUS_LATEST_URL)
       .then((res) => res.json())
       .then((data: ScorePayload) => {
         setTeams(data.teams);
@@ -206,13 +207,13 @@ export default function AttackDefenseCTFGraph({ onDataUpdate }: AttackDefenseCTF
   }, [onDataUpdate]);
 
   // Lazy-load older windows on demand. The latest window is seeded by the
-  // initial fetch above; everything else comes from /status/score{N+1:03d}.json
-  // and is cached for the rest of the session.
+  // initial fetch above; everything else comes from /status/{N} and is
+  // cached for the rest of the session.
   useEffect(() => {
     if (activeTimeWindow == null) return;
     if (windowCache[activeTimeWindow]) return;
     let cancelled = false;
-    fetch(`/status/${scoreFileName(activeTimeWindow)}`)
+    fetch(statusUrl(activeTimeWindow))
       .then((res) => res.json())
       .then((data: ScorePayload) => {
         if (cancelled) return;

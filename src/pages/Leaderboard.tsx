@@ -10,6 +10,7 @@ import {
 import {
   type ScorePayload,
   type SeriesMode,
+  STATUS_LATEST_URL,
   type StatsBlock,
   type TeamData,
   type TeamScoreRow,
@@ -53,7 +54,7 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
   const [chartView, setChartView] = useState<SeriesMode>('cumulative');
 
   useEffect(() => {
-    fetch('/status/latest.json')
+    fetch(STATUS_LATEST_URL)
       .then((response) => response.json())
       .then((data: ScorePayload) => {
         setTeams(data.teams);
