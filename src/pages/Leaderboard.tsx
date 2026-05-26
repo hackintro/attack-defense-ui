@@ -8,9 +8,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  STATUS_LATEST_URL,
   type ScorePayload,
   type SeriesMode,
-  STATUS_LATEST_URL,
   type StatsBlock,
   type TeamData,
   type TeamScoreRow,
@@ -70,8 +70,16 @@ export default function Leaderboard({ onDataUpdate }: LeaderboardProps) {
     const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
 
     const interval = setInterval(() => {
-      confetti({ ...defaults, particleCount: 50, origin: { x: Math.random() * 0.3, y: Math.random() - 0.2 } });
-      confetti({ ...defaults, particleCount: 50, origin: { x: 0.7 + Math.random() * 0.3, y: Math.random() - 0.2 } });
+      confetti({
+        ...defaults,
+        particleCount: 50,
+        origin: { x: Math.random() * 0.3, y: Math.random() - 0.2 },
+      });
+      confetti({
+        ...defaults,
+        particleCount: 50,
+        origin: { x: 0.7 + Math.random() * 0.3, y: Math.random() - 0.2 },
+      });
     }, 250);
 
     return () => clearInterval(interval);

@@ -6,8 +6,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  type ScorePayload,
   STATUS_LATEST_URL,
+  type ScorePayload,
   type StatsBlock,
   type StatusData,
   type TeamData,
