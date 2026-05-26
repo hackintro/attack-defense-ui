@@ -9,19 +9,20 @@
  * a fully replaced service earns 0. The product is rounded to an integer so
  * cumulative totals stay integral.
  *
- * The backend exposes the data through two endpoints:
- *   /status/latest.json          — the most recent window + global stats block
- *   /status/score{N+1:03d}.json  — a specific window (URL counts from 1)
+ * The backend serves JSON directly from FastAPI:
+ *   GET /status/latest         — most recent settled window + global stats block
+ *   GET /status/{window}       — a specific settled window (0-indexed)
+ *   GET /status                — full payload across every settled window
  *
- * Both payloads share the same shape (see `ScorePayload`):
- *   • `status` is keyed by team → window → service, but only contains a
- *     single window's data — enough to drive the live attack ring and the
- *     per-window inspector tooltip.
- *   • `stats.aggregate[teamId][windowKey]` is the team's *per-window score
- *     delta* — the points earned (or lost) in that single window, computed
- *     server-side. Every cumulative display the UI shows (leaderboard,
- *     line chart, graph labels) sums these deltas across windows ≤ N
- *     rather than re-walking the full attack data.
+ * Both per-window payloads share the same shape (see `ScorePayload`):
+ *   • `status` is keyed by team → window → service. For settled windows the
+ *     cells carry full SLA fields (uptime, patch_q, attest, patch_score,
+ *     and the convenience fields uptime_pct, change_pct, score).
+ *   • In-flight windows (cells past `stats.window`) only carry `teams_hit`
+ *     — the public view never shows mid-rotation SLA flicker.
+ *   • `stats.aggregate[teamId][windowKey]` is the team's per-window score
+ *     delta. Cumulative displays sum these across windows ≤ N rather than
+ *     re-walking the full attack data.
  */
 
 export const POINTS = {
@@ -31,12 +32,19 @@ export const POINTS = {
 } as const;
 
 export interface ServiceTick {
-  on: number;
+  // Settled cells carry these; in-flight cells carry only `teams_hit`.
+  on?: number;
   teams_hit: number[];
-  patch_score: number;
-  uptime: number;
-  patch_q: number;
-  attest: number;
+  patch_score?: number;
+  uptime?: number;
+  patch_q?: number;
+  attest?: number;
+  // Convenience fields the backend now includes per cell so the UI doesn't
+  // have to re-derive percentages or per-cell scores. Optional for forwards
+  // compat with payloads that might omit them.
+  uptime_pct?: number;
+  change_pct?: number;
+  score?: number;
 }
 export type ServiceStatus = Record<string, ServiceTick>;
 export type TimeWindowStatus = Record<string, ServiceStatus>;
@@ -82,13 +90,14 @@ export interface TeamSeries {
 }
 
 /**
- * Build the URL path for a specific window. The backend names files with a
- * 1-based, 3-digit index, so window 0 → `score001.json`, window 48 →
- * `score049.json`. Caller is expected to prefix `/status/`.
+ * Build the URL path for a specific window. The backend serves directly
+ * from FastAPI with 0-indexed paths, no .json suffix.
  */
-export function scoreFileName(window: number): string {
-  return `score${String(window + 1).padStart(3, '0')}.json`;
+export function statusUrl(window: number): string {
+  return `/status/${window}`;
 }
+
+export const STATUS_LATEST_URL = '/status/latest';
 
 /**
  * Sorted list of every time window present in `stats.aggregate`. Different
@@ -209,7 +218,7 @@ export interface TeamWindowStats {
  * outer service-status ring + hover tooltip in the live graph.
  *
  * Works on a single-window `StatusData` slice (as returned by both
- * /status/latest.json and /status/score{XYZ}.json).
+ * /status/latest and /status/{N}).
  */
 export function computeWindowStats(
   status: StatusData,
@@ -222,12 +231,16 @@ export function computeWindowStats(
     const services: Record<string, ServiceWindowStats> = {};
     for (const svc of Object.keys(tick)) {
       const s = tick[svc];
-      const uptime = typeof s.on === 'number' ? s.on : s.on ? 1 : 0;
+      // In-flight cells omit SLA fields; default to "operational" placeholders
+      // so the ring renders without flicker until the window settles.
+      const on = s.on ?? 1;
+      const patchScore = s.patch_score ?? 1;
+      const uptime = typeof on === 'number' ? on : on ? 1 : 0;
       const attacksLaunched = s.teams_hit.length;
-      const operationalPoints = s.on ? Math.round(POINTS.operational * s.patch_score) : 0;
+      const operationalPoints = on ? Math.round(POINTS.operational * patchScore) : 0;
       services[svc] = {
         uptime,
-        patchScore: s.patch_score,
+        patchScore,
         attacksLaunched,
         timesCompromised: 0,
         attackers: [],
@@ -282,6 +295,7 @@ export function computeWindowStats(
       t.totals.timesCompromised += sv.timesCompromised;
       if (sv.uptime >= 0.5) t.totals.servicesUp += 1;
       if (sv.patchScore >= 0.99) t.totals.servicesFullyPatched += 1;
+      // patchScore is non-null after the default above, but TS doesn't track that.
       t.totals.totalServices += 1;
     }
     t.totals.windowDelta =
